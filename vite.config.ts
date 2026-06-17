@@ -2,6 +2,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import type { IncomingMessage } from 'node:http'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 import { getBill, BillFetchError } from './server/billScraper'
 import { handleDbOp } from './server/electricityDb'
 import { getUserId, AuthError } from './server/auth'
@@ -77,7 +78,40 @@ function billApiPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), billApiPlugin()],
+  plugins: [
+    react(),
+    billApiPlugin(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      manifest: {
+        name: 'My Home',
+        short_name: 'My Home',
+        description: 'Track home electricity meters, bills and usage.',
+        theme_color: '#1976d2',
+        background_color: '#f5f5f5',
+        display: 'standalone',
+        start_url: '/',
+        icons: [
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          {
+            src: 'pwa-maskable-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      workbox: {
+        // SPA fallback for client routes, but never intercept the API.
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
+      },
+      devOptions: { enabled: false },
+    }),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

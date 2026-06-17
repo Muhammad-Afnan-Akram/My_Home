@@ -12,10 +12,12 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar'
 import TwoWheelerIcon from '@mui/icons-material/TwoWheeler'
 import WaterDropIcon from '@mui/icons-material/WaterDrop'
 import LogoutIcon from '@mui/icons-material/Logout'
+import InstallMobileIcon from '@mui/icons-material/InstallMobile'
 import type { SvgIconComponent } from '@mui/icons-material'
 import { ROUTES } from '@/constants'
 import { Screen } from '@/components'
 import { useAuth } from '@/features/auth'
+import { useInstallPrompt } from '@/pwa/useInstallPrompt'
 
 interface ModuleDef {
   key: string
@@ -35,13 +37,23 @@ const MODULES: ModuleDef[] = [
 function HomePage() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
+  const { canInstall, promptInstall } = useInstallPrompt()
 
   const actions = (
-    <Tooltip title={`Sign out${user?.email ? ` (${user.email})` : ''}`}>
-      <IconButton aria-label="sign out" onClick={() => signOut()}>
-        <LogoutIcon />
-      </IconButton>
-    </Tooltip>
+    <>
+      {canInstall && (
+        <Tooltip title="Install app">
+          <IconButton aria-label="install app" onClick={() => promptInstall()}>
+            <InstallMobileIcon />
+          </IconButton>
+        </Tooltip>
+      )}
+      <Tooltip title={`Sign out${user?.email ? ` (${user.email})` : ''}`}>
+        <IconButton aria-label="sign out" onClick={() => signOut()}>
+          <LogoutIcon />
+        </IconButton>
+      </Tooltip>
+    </>
   )
 
   return (
