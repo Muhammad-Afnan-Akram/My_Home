@@ -1,5 +1,5 @@
-import type { CycleConsumption, DiscoCode, Meter, Reading } from '../types'
-import { cycleStartFor, daysBetween, fromISODate, todayISO } from './date'
+import type { BillInfo, CycleConsumption, DiscoCode, Meter, Reading } from '../types'
+import { addMonths, cycleStartFor, daysBetween, fromISODate, todayISO } from './date'
 
 /** Build the PITC bill URL for a meter (used for the "open bill" link). */
 export function billUrlFor(company: DiscoCode, referenceNumber: string): string {
@@ -56,37 +56,59 @@ export function currentCycle(
 }
 
 /**
- * Compute consumption for the current cycle from a meter's readings.
+ * Compute consumption for the current (unbilled) cycle from a meter's readings.
  *
- * Baseline = latest reading on/before the cycle start. If tracking only
- * began mid-cycle, the earliest reading inside the cycle is used instead
- * (so the figure is a lower bound until a full cycle of data exists).
+ * DISCO bills lag by ~1 month, so the consumption that matters is everything
+ * since the *latest available bill* — its reading date is the cycle start and
+ * its present reading is the baseline. We deliberately anchor to the bill
+ * rather than to a recomputed calendar day: otherwise the window (e.g. "14 Jun
+ * – 14 Jul") drifts away from the actual baseline reading date (e.g. 14 May),
+ * inflating the daily average and triggering false over-limit warnings.
+ *
+ * When no bill has been fetched yet (manual-only meter), we fall back to the
+ * calendar cycle derived from `cycleStartDay`, with the baseline being the
+ * latest reading on/before the cycle start (or the earliest in-cycle reading).
  */
 export function computeCycleConsumption(
   meter: Meter,
   readings: Reading[],
   ref: string = todayISO(),
+  bill?: BillInfo | null,
 ): CycleConsumption {
-  const { cycleStart, cycleEnd } = currentCycle(meter.cycleStartDay, ref)
-  const daysInCycle = daysBetween(cycleStart, cycleEnd)
-  const daysElapsed = Math.max(1, Math.min(daysInCycle, daysBetween(cycleStart, ref) + 1))
-
   const sorted = [...readings].sort((a, b) => a.date.localeCompare(b.date))
 
-  // Baseline: latest reading at or before the cycle start.
-  const beforeOrAt = sorted.filter((r) => r.date <= cycleStart)
-  let baseline = beforeOrAt.length ? beforeOrAt[beforeOrAt.length - 1] : null
+  let cycleStart: string
+  let cycleEnd: string
+  let baselineValue: number | null
 
-  const inCycle = sorted.filter((r) => r.date >= cycleStart && r.date < cycleEnd)
-  if (!baseline && inCycle.length) {
-    // No pre-cycle reading — fall back to the earliest reading in-cycle.
-    baseline = inCycle[0]
+  const anchoredToBill = bill?.readingDate != null && bill.presentReading != null
+  if (anchoredToBill) {
+    // Bill-anchored: count units consumed since the last bill was generated.
+    cycleStart = bill!.readingDate!
+    cycleEnd = addMonths(cycleStart, 1)
+    baselineValue = bill!.presentReading!
+  } else {
+    // Calendar fallback for meters with no fetched bill yet.
+    const cycle = currentCycle(meter.cycleStartDay, ref)
+    cycleStart = cycle.cycleStart
+    cycleEnd = cycle.cycleEnd
+    const beforeOrAt = sorted.filter((r) => r.date <= cycleStart)
+    const inCycle = sorted.filter((r) => r.date >= cycleStart && r.date < cycleEnd)
+    const baseline = beforeOrAt.length
+      ? beforeOrAt[beforeOrAt.length - 1]
+      : (inCycle[0] ?? null)
+    baselineValue = baseline ? baseline.value : null
   }
 
-  const latest = inCycle.length ? inCycle[inCycle.length - 1] : baseline
+  const daysInCycle = daysBetween(cycleStart, cycleEnd)
+  // Honest elapsed days, NOT clamped to the cycle length: if the next bill is
+  // overdue we keep counting so the daily average stays truthful.
+  const daysElapsed = Math.max(1, daysBetween(cycleStart, ref) + 1)
 
-  const baselineValue = baseline ? baseline.value : null
-  const latestValue = latest ? latest.value : null
+  // Latest reading on/after the cycle start; if there's none yet, usage is
+  // zero against the baseline (latest == baseline).
+  const afterStart = sorted.filter((r) => r.date >= cycleStart)
+  const latestValue = afterStart.length ? afterStart[afterStart.length - 1].value : baselineValue
 
   let unitsUsed: number | null = null
   if (baselineValue != null && latestValue != null) {
@@ -96,7 +118,10 @@ export function computeCycleConsumption(
   const unitsRemaining = unitsUsed == null ? null : meter.unitLimit - unitsUsed
 
   const dailyAverage = unitsUsed == null ? null : unitsUsed / daysElapsed
-  const projectedUnits = dailyAverage == null ? null : Math.round(dailyAverage * daysInCycle)
+  // Project over a full cycle; once we're past the expected next reading date
+  // the projection is just the units already used (a full cycle of data).
+  const projectedUnits =
+    dailyAverage == null ? null : Math.round(dailyAverage * Math.max(daysInCycle, daysElapsed))
   const projectedToExceed = projectedUnits != null && projectedUnits > meter.unitLimit
 
   return {
@@ -111,5 +136,6 @@ export function computeCycleConsumption(
     dailyAverage,
     projectedUnits,
     projectedToExceed,
+    anchoredToBill,
   }
 }

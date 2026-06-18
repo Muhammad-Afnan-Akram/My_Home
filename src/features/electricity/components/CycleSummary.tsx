@@ -34,9 +34,25 @@ function CycleSummary({ meter, consumption: c }: CycleSummaryProps) {
       <CardContent>
         <Stack spacing={1.5} sx={{ alignItems: 'center' }}>
           <ConsumptionGauge unitsUsed={c.unitsUsed} limit={meter.unitLimit} size={150} />
-          <Typography variant="body2" color="text.secondary">
-            Cycle {formatShort(c.cycleStart)} – {formatShort(c.cycleEnd)} · {daysLeft} days left
-          </Typography>
+          <Stack spacing={0.25} sx={{ alignItems: 'center' }}>
+            {c.anchoredToBill ? (
+              <>
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+                  Used since your {formatShort(c.cycleStart)} bill ·{' '}
+                  {daysLeft > 0 ? `~${daysLeft} days to next bill` : 'next bill due'}
+                </Typography>
+                {c.baselineValue != null && (
+                  <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+                    Counting from the last bill reading of {c.baselineValue} units
+                  </Typography>
+                )}
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+                Cycle {formatShort(c.cycleStart)} – {formatShort(c.cycleEnd)} · {daysLeft} days left
+              </Typography>
+            )}
+          </Stack>
         </Stack>
 
         <Stack direction="row" sx={{ mt: 2 }} divider={<Box sx={{ width: '1px', bgcolor: 'divider' }} />}>

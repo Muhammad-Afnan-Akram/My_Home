@@ -6,7 +6,7 @@ import Typography from '@mui/material/Typography'
 import Box from '@mui/material/Box'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import type { Reading } from '../types'
-import { formatShort } from '../utils/date'
+import { formatShort, formatTime } from '../utils/date'
 
 interface ReadingsListProps {
   readings: Reading[]
@@ -57,7 +57,12 @@ function ReadingsList({ readings, onDelete }: ReadingsListProps) {
                 )}
               </Typography>
             }
-            secondary={[formatShort(reading.date), reading.note].filter(Boolean).join(' · ')}
+            secondary={[
+              [formatShort(reading.date), formatTime(reading.createdAt)].filter(Boolean).join(', '),
+              reading.note,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           />
         </ListItem>
       ))}

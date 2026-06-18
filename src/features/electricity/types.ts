@@ -127,4 +127,10 @@ export interface CycleConsumption {
   projectedUnits: number | null
   /** Will the projection cross the limit? */
   projectedToExceed: boolean
+  /**
+   * True when the cycle is anchored to the latest official bill (its reading
+   * date + present reading). False means the calendar fallback was used
+   * because no bill has been fetched yet.
+   */
+  anchoredToBill: boolean
 }

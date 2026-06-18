@@ -93,7 +93,7 @@ function MeterDetailPage() {
     )
   }
 
-  const consumption = computeCycleConsumption(meter, meterReadings)
+  const consumption = computeCycleConsumption(meter, meterReadings, undefined, bills[meter.id])
   const latestValue = consumption.latestValue
 
   const handleDelete = async () => {

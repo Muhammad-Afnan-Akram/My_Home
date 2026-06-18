@@ -35,6 +35,12 @@ export function cycleStartFor(year: number, monthIndex: number, day: number): st
   return toISODate(new Date(year, monthIndex, safeDay))
 }
 
+/** Same day-of-month `months` later (or earlier, if negative), as an ISO date. */
+export function addMonths(iso: string, months: number): string {
+  const d = fromISODate(iso)
+  return toISODate(new Date(d.getFullYear(), d.getMonth() + months, d.getDate()))
+}
+
 /** Human-friendly short date, e.g. "17 Jun". */
 export function formatShort(iso: string): string {
   return fromISODate(iso).toLocaleDateString(undefined, {
@@ -47,6 +53,13 @@ export function formatShort(iso: string): string {
 export function isCurrentMonthISO(iso: string, ref: Date = new Date()): boolean {
   const d = fromISODate(iso)
   return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth()
+}
+
+/** Time-of-day from an ISO timestamp, e.g. "2:30 PM". Empty if unparseable. */
+export function formatTime(isoTimestamp: string): string {
+  const t = Date.parse(isoTimestamp)
+  if (Number.isNaN(t)) return ''
+  return new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
 /** Relative time from an ISO timestamp, e.g. "3h ago". */

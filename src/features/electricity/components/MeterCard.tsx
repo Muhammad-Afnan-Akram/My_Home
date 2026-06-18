@@ -11,7 +11,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import BoltIcon from '@mui/icons-material/Bolt'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
-import type { Meter, Reading } from '../types'
+import type { BillInfo, Meter, Reading } from '../types'
 import { DISCOS } from '../types'
 import { computeCycleConsumption } from '../utils/billing'
 import { daysBetween, todayISO, formatRelative, isCurrentMonthISO } from '../utils/date'
@@ -37,6 +37,8 @@ interface MeterCardProps {
   meter: Meter
   readings: Reading[]
   fetching?: boolean
+  /** Latest bill snapshot — anchors the consumption cycle when present. */
+  bill?: BillInfo | null
   /** ISO timestamp of the last successful bill update, if any. */
   lastUpdated?: string
   /** Bill month token from the latest bill, e.g. "MAY 26". */
@@ -52,6 +54,7 @@ function MeterCard({
   meter,
   readings,
   fetching = false,
+  bill,
   lastUpdated,
   billMonth,
   issueDate,
@@ -59,7 +62,7 @@ function MeterCard({
   onRefresh,
   onDelete,
 }: MeterCardProps) {
-  const c = computeCycleConsumption(meter, readings)
+  const c = computeCycleConsumption(meter, readings, undefined, bill)
   const status = consumptionStatus(c.unitsUsed, meter.unitLimit)
   const daysLeft = Math.max(0, daysBetween(todayISO(), c.cycleEnd))
 

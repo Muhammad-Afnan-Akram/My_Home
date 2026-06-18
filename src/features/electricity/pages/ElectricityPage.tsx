@@ -70,6 +70,7 @@ function ElectricityPage() {
               meter={meter}
               readings={readings.filter((r) => r.meterId === meter.id)}
               fetching={fetchingIds.has(meter.id)}
+              bill={bills[meter.id]}
               lastUpdated={bills[meter.id]?.updatedAt}
               billMonth={bills[meter.id]?.billMonth}
               issueDate={bills[meter.id]?.issueDate}
