@@ -25,3 +25,24 @@ export async function fetchScrapedBill(
   }
   return data as ScrapedBill
 }
+
+/**
+ * Fetch the portal's printable bill page as standalone HTML (server-proxied so
+ * it works without leaving the app or hitting CORS). Throws on failure.
+ */
+export async function fetchBillDocument(
+  referenceNumber: string,
+  company?: DiscoCode,
+): Promise<string> {
+  const params = new URLSearchParams({ refno: referenceNumber })
+  if (company) params.set('company', company)
+  const token = await getAccessToken()
+  const res = await fetch(`/api/bill-document?${params.toString()}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new Error(data?.error || 'Failed to load the official bill.')
+  }
+  return res.text()
+}

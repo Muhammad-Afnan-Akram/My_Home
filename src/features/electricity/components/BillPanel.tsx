@@ -13,14 +13,15 @@ import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import TextField from '@mui/material/TextField'
-import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload'
 import EditIcon from '@mui/icons-material/Edit'
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import TrendingDownIcon from '@mui/icons-material/TrendingDown'
 import TrendingFlatIcon from '@mui/icons-material/TrendingFlat'
 import type { BillInfo, Meter, MonthComparison, MonthlyUnit } from '../types'
-import { billUrlFor, yearOverYearComparison } from '../utils/billing'
+import { yearOverYearComparison } from '../utils/billing'
+import { fetchBillDocument } from '../data'
 
 interface BillPanelProps {
   meter: Meter
@@ -297,12 +298,13 @@ function YearComparison({ data }: { data: MonthComparison }) {
 function BillPanel({ meter, bill, unitLimit, onFetch, onSave }: BillPanelProps) {
   const comparison = yearOverYearComparison(bill)
 
-  const url = meter.billUrl || billUrlFor(meter.company, meter.referenceNumber)
   const [editing, setEditing] = useState(false)
   const [fetching, setFetching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({ units: '', amountDue: '', dueDate: '', readingDate: '' })
   const [saving, setSaving] = useState(false)
+  // True while the official bill document is being fetched.
+  const [loadingDoc, setLoadingDoc] = useState(false)
 
   const handleFetch = async () => {
     setFetching(true)
@@ -313,6 +315,26 @@ function BillPanel({ meter, bill, unitLimit, onFetch, onSave }: BillPanelProps) 
       setError(err instanceof Error ? err.message : 'Failed to fetch bill.')
     } finally {
       setFetching(false)
+    }
+  }
+
+  // Open the official bill in a new tab. Pre-open the tab synchronously so iOS
+  // Safari doesn't treat the post-fetch navigation as a blocked popup.
+  const handleViewBill = async () => {
+    const win = window.open('', '_blank')
+    setLoadingDoc(true)
+    setError(null)
+    try {
+      const html = await fetchBillDocument(meter.referenceNumber, meter.company)
+      const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      if (win) win.location.href = blobUrl
+      else window.open(blobUrl, '_blank', 'noopener')
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+    } catch (err) {
+      win?.close()
+      setError(err instanceof Error ? err.message : 'Could not open the official bill.')
+    } finally {
+      setLoadingDoc(false)
     }
   }
 
@@ -405,21 +427,18 @@ function BillPanel({ meter, bill, unitLimit, onFetch, onSave }: BillPanelProps) 
           >
             {fetching ? 'Fetching…' : 'Fetch latest bill'}
           </Button>
-          <Stack direction="row" spacing={1.5}>
-            <Button
-              variant="text"
-              startIcon={<OpenInNewIcon />}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              fullWidth
-            >
-              Official bill
-            </Button>
-            <Button variant="text" startIcon={<EditIcon />} onClick={openEdit} fullWidth>
-              Enter manually
-            </Button>
-          </Stack>
+          <Button
+            variant="outlined"
+            startIcon={<ReceiptLongIcon />}
+            onClick={handleViewBill}
+            disabled={loadingDoc}
+            fullWidth
+          >
+            {loadingDoc ? 'Opening…' : 'Official bill'}
+          </Button>
+          <Button variant="text" startIcon={<EditIcon />} onClick={openEdit} fullWidth>
+            Enter bill manually
+          </Button>
         </Stack>
       </CardContent>
 

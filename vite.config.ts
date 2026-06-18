@@ -3,7 +3,7 @@ import { defineConfig, type Plugin } from 'vite'
 import type { IncomingMessage } from 'node:http'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import { getBill, BillFetchError } from './server/billScraper'
+import { getBill, fetchBillDocument, BillFetchError } from './server/billScraper'
 import { handleDbOp } from './server/electricityDb'
 import { handleBikeOp } from './server/bikeDb'
 import { getUserId, AuthError } from './server/auth'
@@ -47,6 +47,24 @@ function billApiPlugin(): Plugin {
         } catch (err) {
           res.statusCode = err instanceof AuthError ? 401 : err instanceof BillFetchError ? 400 : 500
           res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Failed to fetch bill.' }))
+        }
+      })
+
+      // Printable bill document: GET /api/bill-document?company=&refno= → HTML.
+      server.middlewares.use('/api/bill-document', async (req, res) => {
+        const url = new URL(req.url ?? '', 'http://localhost')
+        const company = url.searchParams.get('company') ?? ''
+        const refno = url.searchParams.get('refno') ?? ''
+        try {
+          await getUserId(req.headers.authorization)
+          const html = await fetchBillDocument(company, refno)
+          res.statusCode = 200
+          res.setHeader('Content-Type', 'text/html; charset=utf-8')
+          res.end(html)
+        } catch (err) {
+          res.setHeader('Content-Type', 'application/json')
+          res.statusCode = err instanceof AuthError ? 401 : err instanceof BillFetchError ? 400 : 500
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Failed to load bill.' }))
         }
       })
 

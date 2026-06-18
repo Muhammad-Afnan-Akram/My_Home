@@ -179,14 +179,13 @@ function getSetCookies(res: Response): string[] {
 export class BillFetchError extends Error {}
 
 /**
- * Fetch and parse a bill for the given company + reference number.
+ * Run the portal's search flow and return the rendered bill page HTML. The site
+ * is ASP.NET WebForms: load the search page for cookies + anti-forgery +
+ * viewstate, then POST the reference number. The POST 302-redirects to
+ * `/general?refno=...`, which `fetch` auto-follows to the full bill page.
  * Throws BillFetchError with a user-friendly message on failure.
  */
-export async function fetchBill(company: string, refno: string): Promise<ScrapedBill> {
-  const safeCompany = company.toLowerCase().replace(/[^a-z]/g, '')
-  const ref = refno.replace(/\s+/g, '')
-  if (!safeCompany || !ref) throw new BillFetchError('Company and reference number are required.')
-
+async function fetchBillPageHtml(safeCompany: string, ref: string): Promise<string> {
   const base = `https://bill.pitc.com.pk/${safeCompany}bill`
 
   // Step 1: load the search page to get cookies + anti-forgery + viewstate.
@@ -212,7 +211,7 @@ export async function fetchBill(company: string, refno: string): Promise<Scraped
     btnSearch: 'Search',
   })
 
-  // Step 2: POST the search.
+  // Step 2: POST the search (fetch follows the redirect to the bill page).
   const result = await fetch(base, {
     method: 'POST',
     headers: {
@@ -233,12 +232,53 @@ export async function fetchBill(company: string, refno: string): Promise<Scraped
   if (/Given Ref\/App No is invalid|invalid reference/i.test(html)) {
     throw new BillFetchError('Reference number not found on the portal. Double-check it.')
   }
+  return html
+}
 
+/**
+ * Fetch and parse a bill for the given company + reference number.
+ * Throws BillFetchError with a user-friendly message on failure.
+ */
+export async function fetchBill(company: string, refno: string): Promise<ScrapedBill> {
+  const safeCompany = company.toLowerCase().replace(/[^a-z]/g, '')
+  const ref = refno.replace(/\s+/g, '')
+  if (!safeCompany || !ref) throw new BillFetchError('Company and reference number are required.')
+
+  const html = await fetchBillPageHtml(safeCompany, ref)
   const bill = parseBill(html, safeCompany, ref)
   if (bill.unitsConsumed == null && bill.payableWithinDueDate == null) {
     throw new BillFetchError('Could not read the bill. The portal layout may have changed.')
   }
   return bill
+}
+
+/** Make the portal's printable bill page render standalone by resolving its
+ *  relative CSS/image URLs against the portal origin. */
+function injectBase(html: string, href: string): string {
+  const tag = `<base href="${href}">`
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => `${m}${tag}`)
+  if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, (m) => `${m}<head>${tag}</head>`)
+  return `${tag}${html}`
+}
+
+/**
+ * Fetch the portal's rendered bill page (the same document the "Official bill"
+ * link opens) as standalone HTML, so the app can show or download it directly
+ * instead of redirecting the user to the DISCO site. Uses the same search flow
+ * as the scraper. Throws BillFetchError on failure.
+ */
+export async function fetchBillDocument(company: string, refno: string): Promise<string> {
+  const safeCompany = company.toLowerCase().replace(/[^a-z]/g, '')
+  const ref = refno.replace(/\s+/g, '')
+  if (!safeCompany || !ref) throw new BillFetchError('Company and reference number are required.')
+
+  let html = await fetchBillPageHtml(safeCompany, ref)
+  // The portal mislabels the page as utf-16; we re-emit it as utf-8, so align
+  // the meta charset or the browser garbles it when read from a blob/file.
+  html = html.replace(/<meta\s+charset\s*=\s*["']?utf-16["']?\s*\/?>/i, '<meta charset="utf-8" />')
+  // Resolve the page's relative CSS/images against the portal so it renders
+  // standalone when opened from a blob URL or a downloaded file.
+  return injectBase(html, `https://bill.pitc.com.pk/${safeCompany}bill/`)
 }
 
 /** All PITC-hosted DISCO portal codes. */

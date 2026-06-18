@@ -8,7 +8,7 @@ import type { ElectricityRepository } from './repository'
  */
 export const electricityRepo: ElectricityRepository = new ApiElectricityRepository()
 
-export { fetchScrapedBill } from './billApi'
+export { fetchScrapedBill, fetchBillDocument } from './billApi'
 
 export type {
   ElectricityRepository,

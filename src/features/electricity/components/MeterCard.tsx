@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Card from '@mui/material/Card'
 import CardActionArea from '@mui/material/CardActionArea'
 import Box from '@mui/material/Box'
@@ -8,12 +9,17 @@ import Divider from '@mui/material/Divider'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
 import CircularProgress from '@mui/material/CircularProgress'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import BoltIcon from '@mui/icons-material/Bolt'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import EventIcon from '@mui/icons-material/Event'
 import PaymentsIcon from '@mui/icons-material/Payments'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import CheckIcon from '@mui/icons-material/Check'
 import type { BillInfo, Meter, Reading } from '../types'
+import { copyToClipboard } from '@/lib/clipboard'
 import { computeCycleConsumption } from '../utils/billing'
 import { daysBetween, todayISO, formatRelative, formatLongDate, formatShort, isCurrentMonthISO } from '../utils/date'
 import { consumptionStatus } from '../utils/consumption'
@@ -64,9 +70,25 @@ function MeterCard({
   onRefresh,
   onDelete,
 }: MeterCardProps) {
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
+  const gaugeSize = isMobile ? 84 : 96
+  const dividerColor = theme.palette.divider
+
   const c = computeCycleConsumption(meter, readings, undefined, bill, unitLimit)
   const status = consumptionStatus(c.unitsUsed, unitLimit)
   const daysLeft = Math.max(0, daysBetween(todayISO(), c.cycleEnd))
+  const [copied, setCopied] = useState(false)
+
+  // Copy the reference number without triggering the card's navigation.
+  const handleCopyRef = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (await copyToClipboard(meter.referenceNumber)) {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    }
+  }
 
   // Latest if the bill was issued in the current calendar month.
   const isLatest = Boolean(issueDate && isCurrentMonthISO(issueDate))
@@ -77,103 +99,160 @@ function MeterCard({
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardActionArea onClick={onClick} sx={{ p: 2 }}>
-        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-          <ConsumptionGauge unitsUsed={c.unitsUsed} limit={unitLimit} size={96} />
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-              <BoltIcon fontSize="small" color="warning" />
-              <Typography variant="h6" noWrap sx={{ fontWeight: 600 }}>
-                {meter.name}
-              </Typography>
-            </Stack>
-            <Typography variant="body2" color="text.secondary" noWrap>
-              {discoLabel(meter.company)}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-              Ref: {meter.referenceNumber}
-            </Typography>
-            {c.anchoredToBill && (
-              <Typography
-                variant="caption"
-                noWrap
-                sx={{ display: 'block', color: 'text.disabled', fontSize: '0.68rem' }}
-              >
-                Last Official Bill: {formatLongDate(c.cycleStart)}
-              </Typography>
-            )}
-            <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
-              {fetching ? (
-                <>
-                  <CircularProgress size={14} />
-                  <Typography variant="caption" color="text.secondary">
-                    Fetching bill…
-                  </Typography>
-                </>
-              ) : (
-                <>
-                  {unitLimit > 0 && (
-                    <Chip
-                      size="small"
-                      label={STATUS_LABEL[status]}
-                      color={STATUS_COLOR[status]}
-                      variant={status === 'safe' ? 'outlined' : 'filled'}
-                    />
-                  )}
-                  <Typography variant="caption" color="text.secondary">
-                    {c.unitsUsed == null
-                      ? unitLimit > 0
-                        ? `Limit ${unitLimit}`
-                        : 'No limit set'
-                      : unitLimit > 0
-                        ? `${c.unitsUsed} / ${unitLimit} · ${daysLeft}d left`
-                        : `${c.unitsUsed} units · ${daysLeft}d left`}
-                  </Typography>
-                  {estimated && (
-                    <Chip
-                      size="small"
-                      color="warning"
-                      variant="outlined"
-                      label="⚠ Estimated from last bill"
-                    />
-                  )}
-                </>
-              )}
-            </Stack>
-            {(billMonth || issueDate) && (
-              <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                {billMonth && <Chip size="small" variant="outlined" label={`Bill: ${billMonth}`} />}
-                {issueDate &&
-                  (isLatest ? (
-                    <Chip size="small" color="success" variant="filled" label="Latest" />
-                  ) : (
-                    <Chip
-                      size="small"
-                      color="warning"
-                      variant="filled"
-                      label="Waiting for next bill"
-                    />
-                  ))}
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          sx={{ alignItems: { xs: 'stretch', sm: 'center' } }}
+        >
+          {/* Gauge + identity always sit side by side; this group takes the full
+              row width on mobile so the name/ref never get squeezed. */}
+          <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flex: 1, minWidth: 0 }}>
+            <ConsumptionGauge unitsUsed={c.unitsUsed} limit={unitLimit} size={gaugeSize} />
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                <BoltIcon fontSize="small" color="warning" />
+                <Typography variant="h6" noWrap sx={{ fontWeight: 600 }}>
+                  {meter.name}
+                </Typography>
               </Stack>
-            )}
-          </Box>
+              <Typography variant="body2" color="text.secondary" noWrap>
+                {discoLabel(meter.company)}
+              </Typography>
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  Ref: {meter.referenceNumber}
+                </Typography>
+                <Tooltip title={copied ? 'Copied!' : 'Copy reference number'}>
+                  <Box
+                    component="span"
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Copy reference number"
+                    onClick={handleCopyRef}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    sx={{
+                      display: 'inline-flex',
+                      flexShrink: 0,
+                      cursor: 'pointer',
+                      color: copied ? 'success.main' : 'text.secondary',
+                      '&:hover': { color: 'text.primary' },
+                    }}
+                  >
+                    {copied ? (
+                      <CheckIcon sx={{ fontSize: 15 }} />
+                    ) : (
+                      <ContentCopyIcon sx={{ fontSize: 14 }} />
+                    )}
+                  </Box>
+                </Tooltip>
+              </Stack>
+              {c.anchoredToBill && (
+                <Typography
+                  variant="caption"
+                  noWrap
+                  sx={{ display: 'block', color: 'text.disabled', fontSize: '0.68rem' }}
+                >
+                  Last Official Bill: {formatLongDate(c.cycleStart)}
+                </Typography>
+              )}
+              <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
+                {fetching ? (
+                  <>
+                    <CircularProgress size={14} />
+                    <Typography variant="caption" color="text.secondary">
+                      Fetching bill…
+                    </Typography>
+                  </>
+                ) : (
+                  <>
+                    {unitLimit > 0 && (
+                      <Chip
+                        size="small"
+                        label={STATUS_LABEL[status]}
+                        color={STATUS_COLOR[status]}
+                        variant={status === 'safe' ? 'outlined' : 'filled'}
+                      />
+                    )}
+                    <Typography variant="caption" color="text.secondary">
+                      {c.unitsUsed == null
+                        ? unitLimit > 0
+                          ? `Limit ${unitLimit}`
+                          : 'No limit set'
+                        : unitLimit > 0
+                          ? `${c.unitsUsed} / ${unitLimit} · ${daysLeft}d left`
+                          : `${c.unitsUsed} units · ${daysLeft}d left`}
+                    </Typography>
+                    {estimated && (
+                      <Chip
+                        size="small"
+                        color="warning"
+                        variant="outlined"
+                        label="⚠ Estimated from last bill"
+                      />
+                    )}
+                  </>
+                )}
+              </Stack>
+              {(billMonth || issueDate) && (
+                <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
+                  {billMonth && <Chip size="small" variant="outlined" label={`Bill: ${billMonth}`} />}
+                  {issueDate &&
+                    (isLatest ? (
+                      <Chip size="small" color="success" variant="filled" label="Latest" />
+                    ) : (
+                      <Chip
+                        size="small"
+                        color="warning"
+                        variant="filled"
+                        label="Waiting for next bill"
+                      />
+                    ))}
+                </Stack>
+              )}
+            </Box>
+          </Stack>
+
+          {/* Separator: a hairline below the identity block on mobile, a vertical
+              rule between the two columns on desktop. */}
           {isLatest && bill && (
             <Box
               sx={{
                 alignSelf: 'stretch',
-                width: '2px',
-                borderRadius: 1,
                 flexShrink: 0,
-                background: (theme) =>
-                  `linear-gradient(to bottom, transparent, ${theme.palette.divider} 18%, ${theme.palette.divider} 82%, transparent)`,
+                borderRadius: 1,
+                width: { xs: '100%', sm: '2px' },
+                height: { xs: '2px', sm: 'auto' },
+                background: {
+                  xs: `linear-gradient(to right, transparent, ${dividerColor} 18%, ${dividerColor} 82%, transparent)`,
+                  sm: `linear-gradient(to bottom, transparent, ${dividerColor} 18%, ${dividerColor} 82%, transparent)`,
+                },
               }}
             />
           )}
+
+          {/* Current bill: a wrapping row across the card on mobile, a right-aligned
+              column on desktop. */}
           {isLatest && bill && (
-            <Stack spacing={0.75} sx={{ alignItems: 'flex-end', flexShrink: 0 }}>
+            <Stack
+              direction={{ xs: 'row', sm: 'column' }}
+              spacing={0.75}
+              sx={{
+                alignItems: { xs: 'center', sm: 'flex-end' },
+                justifyContent: { xs: 'flex-start', sm: 'initial' },
+                flexShrink: 0,
+                flexWrap: 'wrap',
+                rowGap: 0.75,
+              }}
+            >
               <Typography
                 variant="overline"
                 color="text.secondary"
-                sx={{ lineHeight: 1.4, fontWeight: 700, letterSpacing: 0.5 }}
+                sx={{
+                  lineHeight: 1.4,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  width: { xs: '100%', sm: 'auto' },
+                }}
               >
                 Current bill
               </Typography>

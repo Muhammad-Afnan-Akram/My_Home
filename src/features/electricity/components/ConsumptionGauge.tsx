@@ -15,6 +15,11 @@ interface ConsumptionGaugeProps {
   size?: number
 }
 
+/** Pick a Typography variant for the big centre number that suits the ring size. */
+function centreVariant(size: number) {
+  return size < 90 ? 'h5' : 'h4'
+}
+
 /** Circular gauge: remaining units in the centre, ring fills as you consume. */
 function ConsumptionGauge({ unitsUsed, limit, size = 132 }: ConsumptionGaugeProps) {
   const hasLimit = limit > 0
@@ -60,7 +65,7 @@ function ConsumptionGauge({ unitsUsed, limit, size = 132 }: ConsumptionGaugeProp
         ) : !hasLimit ? (
           <>
             <Typography
-              variant="h4"
+              variant={centreVariant(size)}
               component="div"
               color="text.primary"
               sx={{ fontWeight: 700, lineHeight: 1 }}
@@ -74,7 +79,7 @@ function ConsumptionGauge({ unitsUsed, limit, size = 132 }: ConsumptionGaugeProp
         ) : (
           <>
             <Typography
-              variant="h4"
+              variant={centreVariant(size)}
               component="div"
               color={`${color}.main`}
               sx={{ fontWeight: 700, lineHeight: 1 }}
