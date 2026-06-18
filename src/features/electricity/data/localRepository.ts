@@ -1,4 +1,4 @@
-import type { BillInfo, Meter, Reading } from '../types'
+import type { BillInfo, Meter, Reading, Settings } from '../types'
 import type {
   ElectricityRepository,
   MeterPatch,
@@ -10,7 +10,10 @@ const KEYS = {
   meters: 'myhome.electricity.meters',
   readings: 'myhome.electricity.readings',
   bills: 'myhome.electricity.bills',
+  settings: 'myhome.electricity.settings',
 } as const
+
+const DEFAULT_SETTINGS: Settings = { unitLimit: 200 }
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -105,5 +108,14 @@ export class LocalElectricityRepository implements ElectricityRepository {
     else bills[idx] = bill
     write(KEYS.bills, bills)
     return bill
+  }
+
+  async getSettings(): Promise<Settings> {
+    return read<Settings>(KEYS.settings, DEFAULT_SETTINGS)
+  }
+
+  async saveSettings(settings: Settings): Promise<Settings> {
+    write(KEYS.settings, settings)
+    return settings
   }
 }

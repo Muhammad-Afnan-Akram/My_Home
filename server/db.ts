@@ -46,6 +46,11 @@ create table if not exists readings (
   created_at timestamptz not null default now()
 );
 create index if not exists readings_meter_idx on readings(meter_id);
+create table if not exists settings (
+  user_id uuid primary key,
+  unit_limit int not null default 200,
+  updated_at timestamptz not null default now()
+);
 create table if not exists bills (
   meter_id uuid primary key references meters(id) on delete cascade,
   units double precision,

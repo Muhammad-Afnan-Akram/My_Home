@@ -41,6 +41,12 @@ export interface Meter {
   createdAt: string
 }
 
+/** Per-user app settings, persisted in the database. */
+export interface Settings {
+  /** Protected-slab unit limit applied to every meter (0 = no limit). */
+  unitLimit: number
+}
+
 /** A single meter reading entered by the user. */
 export interface Reading {
   id: string

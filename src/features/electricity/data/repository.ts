@@ -1,4 +1,4 @@
-import type { BillInfo, Meter, Reading } from '../types'
+import type { BillInfo, Meter, Reading, Settings } from '../types'
 
 export type NewMeter = Omit<Meter, 'id' | 'createdAt'>
 export type MeterPatch = Partial<Omit<Meter, 'id' | 'createdAt'>>
@@ -22,4 +22,7 @@ export interface ElectricityRepository {
 
   getBill(meterId: string): Promise<BillInfo | null>
   saveBill(bill: BillInfo): Promise<BillInfo>
+
+  getSettings(): Promise<Settings>
+  saveSettings(settings: Settings): Promise<Settings>
 }

@@ -260,6 +260,27 @@ export async function saveBill(bill: BillInfo, userId: string): Promise<BillInfo
   return mapBill(rows[0])
 }
 
+const DEFAULT_UNIT_LIMIT = 200
+
+/** Per-user app settings. Falls back to defaults when no row exists yet. */
+export async function getSettings(userId: string): Promise<{ unitLimit: number }> {
+  const rows = await query('select unit_limit from settings where user_id = $1', [userId])
+  return { unitLimit: rows.length ? Number(rows[0].unit_limit) : DEFAULT_UNIT_LIMIT }
+}
+
+export async function saveSettings(
+  input: { unitLimit: number },
+  userId: string,
+): Promise<{ unitLimit: number }> {
+  const rows = await query(
+    `insert into settings (user_id, unit_limit, updated_at) values ($1, $2, now())
+     on conflict (user_id) do update set unit_limit = excluded.unit_limit, updated_at = now()
+     returning unit_limit`,
+    [userId, Math.max(0, Math.round(input.unitLimit))],
+  )
+  return { unitLimit: Number(rows[0].unit_limit) }
+}
+
 /**
  * Whitelisted RPC dispatch used by the /api/db endpoint. Every op is scoped
  * to the authenticated user, so a user can only touch their own data.
@@ -288,6 +309,10 @@ export async function handleDbOp(
       return getBill(String(payload.meterId), userId)
     case 'saveBill':
       return saveBill(payload as unknown as BillInfo, userId)
+    case 'getSettings':
+      return getSettings(userId)
+    case 'saveSettings':
+      return saveSettings(payload as unknown as { unitLimit: number }, userId)
     default:
       throw new Error(`Unknown op: ${op}`)
   }

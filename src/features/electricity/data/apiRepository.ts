@@ -1,4 +1,4 @@
-import type { BillInfo, Meter, Reading } from '../types'
+import type { BillInfo, Meter, Reading, Settings } from '../types'
 import { getAccessToken } from '@/lib/supabase'
 import type {
   ElectricityRepository,
@@ -67,5 +67,13 @@ export class ApiElectricityRepository implements ElectricityRepository {
 
   saveBill(bill: BillInfo): Promise<BillInfo> {
     return rpc<BillInfo>('saveBill', bill as unknown as Record<string, unknown>)
+  }
+
+  getSettings(): Promise<Settings> {
+    return rpc<Settings>('getSettings')
+  }
+
+  saveSettings(settings: Settings): Promise<Settings> {
+    return rpc<Settings>('saveSettings', settings as unknown as Record<string, unknown>)
   }
 }

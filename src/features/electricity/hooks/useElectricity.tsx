@@ -11,6 +11,7 @@ const REFRESH_MS = 12 * 60 * 60 * 1000
 const UNIT_LIMIT_KEY = 'myhome.electricity.unitLimit'
 const DEFAULT_UNIT_LIMIT = 200
 
+// localStorage is only an instant cache; the database is the source of truth.
 function readUnitLimit(): number {
   try {
     const raw = localStorage.getItem(UNIT_LIMIT_KEY)
@@ -20,6 +21,14 @@ function readUnitLimit(): number {
     return Number.isFinite(n) && n >= 0 ? n : DEFAULT_UNIT_LIMIT
   } catch {
     return DEFAULT_UNIT_LIMIT
+  }
+}
+
+function cacheUnitLimit(limit: number): void {
+  try {
+    localStorage.setItem(UNIT_LIMIT_KEY, String(limit))
+  } catch {
+    /* non-fatal: keep the in-memory value */
   }
 }
 
@@ -37,11 +46,11 @@ export function ElectricityProvider({ children }: { children: ReactNode }) {
     // 0 means "no slab limit"; anything invalid falls back to the default.
     const next = Number.isFinite(rounded) && rounded >= 0 ? rounded : DEFAULT_UNIT_LIMIT
     setUnitLimitState(next)
-    try {
-      localStorage.setItem(UNIT_LIMIT_KEY, String(next))
-    } catch {
-      /* non-fatal: keep the in-memory value */
-    }
+    cacheUnitLimit(next) // instant local cache so reloads don't flash the default
+    // Persist to the database (source of truth across devices/sessions).
+    void electricityRepo.saveSettings({ unitLimit: next }).catch(() => {
+      /* keep the cached value; a later save or reload will reconcile */
+    })
   }, [])
 
   // Refs so the background refresh pass and the concurrency guard can read
@@ -60,9 +69,10 @@ export function ElectricityProvider({ children }: { children: ReactNode }) {
     let active = true
     ;(async () => {
       try {
-        const [m, r] = await Promise.all([
+        const [m, r, settings] = await Promise.all([
           electricityRepo.getMeters(),
           electricityRepo.getReadings(),
+          electricityRepo.getSettings(),
         ])
         const billEntries = await Promise.all(
           m.map(async (meter) => [meter.id, await electricityRepo.getBill(meter.id)] as const),
@@ -73,6 +83,8 @@ export function ElectricityProvider({ children }: { children: ReactNode }) {
         setBills(
           Object.fromEntries(billEntries.filter(([, b]) => b != null)) as Record<string, BillInfo>,
         )
+        setUnitLimitState(settings.unitLimit)
+        cacheUnitLimit(settings.unitLimit)
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : 'Failed to load data.')
       } finally {
