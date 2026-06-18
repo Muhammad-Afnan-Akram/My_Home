@@ -20,7 +20,7 @@ export interface ScrapedBill {
   dueDate?: string
   payableWithinDueDate?: number
   payableAfterDueDate?: number
-  history: { month: string; units: number }[]
+  history: { month: string; units: number; amount?: number }[]
   fetchedAt: string
 }
 
@@ -110,7 +110,7 @@ function parseBill(html: string, company: string, referenceNumber: string): Scra
   }
 
   // 12-month history table: MONTH / UNITS / BILL / PAYMENT
-  const history: { month: string; units: number }[] = []
+  const history: { month: string; units: number; amount?: number }[] = []
   const pi = L.indexOf('PAYMENT')
   if (pi !== -1) {
     let j = pi + 1
@@ -121,7 +121,8 @@ function parseBill(html: string, company: string, referenceNumber: string): Scra
         if (L[k] === 'EX') k += 1
         const units = toNumber(L[k])
         if (units == null) break
-        history.push({ month, units })
+        // Columns after the month: UNITS (k), BILL (k+1), PAYMENT (k+2).
+        history.push({ month, units, amount: toNumber(L[k + 1]) })
         j = k + 3 // skip units, bill, payment
       } else if (history.length) {
         break

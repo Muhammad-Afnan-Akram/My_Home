@@ -63,6 +63,8 @@ export interface Reading {
 export interface MonthlyUnit {
   month: string
   units: number
+  /** Bill amount (Rs) for that month, from the bill's BILL column. */
+  amount?: number
 }
 
 /**
@@ -107,6 +109,17 @@ export interface ScrapedBill {
   payableAfterDueDate?: number
   history: MonthlyUnit[]
   fetchedAt: string
+}
+
+/** Year-over-year comparison of one month against the same month last year. */
+export interface MonthComparison {
+  /** Current month label, e.g. "May25". */
+  currentMonth: string
+  /** Same month last year, e.g. "May24". */
+  previousMonth: string
+  units: { current: number; previous: number }
+  /** Present only when both months carry a bill amount. */
+  amount?: { current: number; previous: number }
 }
 
 /** Derived consumption summary for the current billing cycle. */

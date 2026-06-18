@@ -16,8 +16,11 @@ import TextField from '@mui/material/TextField'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload'
 import EditIcon from '@mui/icons-material/Edit'
-import type { BillInfo, Meter, MonthlyUnit } from '../types'
-import { billUrlFor } from '../utils/billing'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import TrendingDownIcon from '@mui/icons-material/TrendingDown'
+import TrendingFlatIcon from '@mui/icons-material/TrendingFlat'
+import type { BillInfo, Meter, MonthComparison, MonthlyUnit } from '../types'
+import { billUrlFor, yearOverYearComparison } from '../utils/billing'
 
 interface BillPanelProps {
   meter: Meter
@@ -141,7 +144,159 @@ function History({ history, limit }: { history: MonthlyUnit[]; limit: number }) 
   )
 }
 
+/** "May25" or "MAY 26" -> "May '25" for a friendlier label. */
+function prettyMonth(token: string): string {
+  const m = token.match(/^([A-Za-z]{3})\s*(\d{2})$/)
+  if (!m) return token
+  const name = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase()
+  return `${name} '${m[2]}`
+}
+
+/** A labelled value column ("This year" / "Last year") inside a metric. */
+function SideValue({
+  caption,
+  value,
+  strong,
+}: {
+  caption: string
+  value: string
+  strong?: boolean
+}) {
+  return (
+    <Box sx={{ minWidth: 0 }}>
+      <Typography
+        variant="caption"
+        sx={{ display: 'block', color: strong ? 'text.secondary' : 'text.disabled' }}
+      >
+        {caption}
+      </Typography>
+      <Typography
+        variant={strong ? 'h6' : 'body1'}
+        noWrap
+        sx={{ fontWeight: strong ? 700 : 500, color: strong ? 'text.primary' : 'text.secondary', lineHeight: 1.3 }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  )
+}
+
+/**
+ * One metric (units or bill amount) compared year-over-year. Shows the two
+ * values side by side under clear "This year"/"Last year" captions, a delta
+ * chip, and a plain-language summary line. For electricity higher means more
+ * usage/cost, so an increase is red and a decrease green.
+ */
+function ComparisonMetric({
+  label,
+  noun,
+  thisYear,
+  lastYear,
+  current,
+  previous,
+  format,
+}: {
+  label: string
+  noun: string
+  thisYear: string
+  lastYear: string
+  current: number
+  previous: number
+  format: (n: number) => string
+}) {
+  const delta = current - previous
+  const pct = previous > 0 ? Math.round((delta / previous) * 100) : null
+  const up = delta > 0
+  const flat = delta === 0
+  const color = flat ? 'text.secondary' : up ? 'error.main' : 'success.main'
+  const Icon = flat ? TrendingFlatIcon : up ? TrendingUpIcon : TrendingDownIcon
+  const word = flat ? 'same as' : up ? 'more than' : 'less than'
+
+  return (
+    <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}>
+      <Stack
+        direction="row"
+        sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}
+      >
+        <Typography
+          variant="caption"
+          sx={{ fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: 'text.secondary' }}
+        >
+          {label}
+        </Typography>
+        <Chip
+          size="small"
+          icon={<Icon sx={{ fontSize: 16, ml: 0.5 }} />}
+          label={flat ? 'No change' : `${up ? '+' : '−'}${Math.abs(pct ?? 0)}%`}
+          sx={{
+            height: 22,
+            fontWeight: 700,
+            color,
+            borderColor: color,
+            '& .MuiChip-icon': { color },
+          }}
+          variant="outlined"
+        />
+      </Stack>
+
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <SideValue caption={`This year · ${thisYear}`} value={format(current)} strong />
+        <TrendingFlatIcon sx={{ fontSize: 18, color: 'text.disabled', mb: 0.5 }} />
+        <SideValue caption={`Last year · ${lastYear}`} value={format(previous)} />
+      </Stack>
+
+      <Typography variant="caption" sx={{ display: 'block', mt: 1, color }}>
+        {flat
+          ? 'Same as last year'
+          : `${format(Math.abs(delta))}${noun ? ` ${noun}` : ''} ${word} last year`}
+      </Typography>
+    </Box>
+  )
+}
+
+/** Year-over-year highlight: this month vs the same month last year. */
+function YearComparison({ data }: { data: MonthComparison }) {
+  const thisYear = prettyMonth(data.currentMonth)
+  const lastYear = prettyMonth(data.previousMonth)
+
+  return (
+    <Box>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.25 }}>
+        Compared to last year
+      </Typography>
+      <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mb: 1.5 }}>
+        {thisYear} vs the same month last year ({lastYear})
+      </Typography>
+
+      <Stack spacing={1.25}>
+        <ComparisonMetric
+          label="Units used"
+          noun="units"
+          thisYear={thisYear}
+          lastYear={lastYear}
+          current={data.units.current}
+          previous={data.units.previous}
+          format={(n) => `${n}`}
+        />
+        {data.amount && (
+          <ComparisonMetric
+            label="Bill amount"
+            noun=""
+            thisYear={thisYear}
+            lastYear={lastYear}
+            current={data.amount.current}
+            previous={data.amount.previous}
+            format={(n) => `Rs ${n.toLocaleString()}`}
+          />
+        )}
+      </Stack>
+    </Box>
+  )
+}
+
 function BillPanel({ meter, bill, unitLimit, onFetch, onSave }: BillPanelProps) {
+  const comparison = yearOverYearComparison(bill)
+
   const url = meter.billUrl || billUrlFor(meter.company, meter.referenceNumber)
   const [editing, setEditing] = useState(false)
   const [fetching, setFetching] = useState(false)
@@ -223,6 +378,13 @@ function BillPanel({ meter, bill, unitLimit, onFetch, onSave }: BillPanelProps) 
           <Row label="Due date" value={bill?.dueDate} />
           {bill?.presentReading != null && <Row label="Reading on bill" value={bill.presentReading} />}
         </Stack>
+
+        {comparison && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <YearComparison data={comparison} />
+          </>
+        )}
 
         {bill?.history && bill.history.length > 0 && (
           <>

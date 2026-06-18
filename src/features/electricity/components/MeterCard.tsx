@@ -157,6 +157,18 @@ function MeterCard({
             )}
           </Box>
           {isLatest && bill && (
+            <Box
+              sx={{
+                alignSelf: 'stretch',
+                width: '2px',
+                borderRadius: 1,
+                flexShrink: 0,
+                background: (theme) =>
+                  `linear-gradient(to bottom, transparent, ${theme.palette.divider} 18%, ${theme.palette.divider} 82%, transparent)`,
+              }}
+            />
+          )}
+          {isLatest && bill && (
             <Stack spacing={0.75} sx={{ alignItems: 'flex-end', flexShrink: 0 }}>
               <Typography
                 variant="overline"

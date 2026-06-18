@@ -1,4 +1,11 @@
-import type { BillInfo, CycleConsumption, DiscoCode, Meter, Reading } from '../types'
+import type {
+  BillInfo,
+  CycleConsumption,
+  DiscoCode,
+  Meter,
+  MonthComparison,
+  Reading,
+} from '../types'
 import { addMonths, cycleStartFor, daysBetween, fromISODate, todayISO } from './date'
 
 /** Build the PITC bill URL for a meter (used for the "open bill" link). */
@@ -8,6 +15,48 @@ export function billUrlFor(company: DiscoCode, referenceNumber: string): string 
 }
 
 const MONTHS3 = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+
+/**
+ * Parse a bill-history month token like "May25" into a sortable month index
+ * (year * 12 + month) so we can find the entry exactly 12 months earlier.
+ */
+function historyMonthIndex(token: string): number | null {
+  const m = token.trim().match(/^([A-Za-z]{3})(\d{2})$/)
+  if (!m) return null
+  const month = MONTHS3.indexOf(m[1].toUpperCase())
+  if (month < 0) return null
+  return (2000 + Number(m[2])) * 12 + month
+}
+
+/**
+ * Compare the current bill (its headline units + amount) against the same month
+ * a year earlier, taken from the bill history. Anchored to the latest bill so
+ * the "current" figures match what's shown above in the bill summary.
+ *
+ * Returns null when there's no bill month, or the history doesn't carry the
+ * same month from last year. Amounts are included only when both sides have one.
+ */
+export function yearOverYearComparison(bill: BillInfo | null | undefined): MonthComparison | null {
+  if (!bill?.billMonth || !bill.history?.length || bill.units == null) return null
+
+  const current = parseBillMonth(bill.billMonth)
+  if (!current) return null
+  // parseBillMonth months are 1-based; align to the 0-based history index scale.
+  const currentIdx = current.year * 12 + (current.month - 1)
+
+  const previous = bill.history.find((h) => historyMonthIndex(h.month) === currentIdx - 12)
+  if (!previous) return null
+
+  const comparison: MonthComparison = {
+    currentMonth: bill.billMonth,
+    previousMonth: previous.month,
+    units: { current: bill.units, previous: previous.units },
+  }
+  if (bill.amountDue != null && previous.amount != null) {
+    comparison.amount = { current: bill.amountDue, previous: previous.amount }
+  }
+  return comparison
+}
 
 /** Parse a PITC bill-month token like "MAY 26" into { year, month }. */
 export function parseBillMonth(billMonth?: string): { year: number; month: number } | null {
