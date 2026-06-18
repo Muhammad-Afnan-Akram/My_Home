@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -17,10 +17,12 @@ import SearchIcon from '@mui/icons-material/Search'
 import type { ScrapedBill } from '../types'
 import type { NewMeter } from '../data'
 import { fetchScrapedBill } from '../data'
-import { discoLabel } from './MeterCard'
+import { discoLabel } from '../utils/disco'
 
 interface AddMeterDialogProps {
   open: boolean
+  /** Global protected-slab limit applied to every meter (stored on save). */
+  unitLimit: number
   onClose: () => void
   onSubmit: (input: NewMeter, scraped: ScrapedBill) => Promise<unknown> | void
 }
@@ -45,7 +47,7 @@ function DetailRow({ label, value }: { label: string; value?: string | number })
   )
 }
 
-function AddMeterDialog({ open, onClose, onSubmit }: AddMeterDialogProps) {
+function AddMeterDialog({ open, unitLimit, onClose, onSubmit }: AddMeterDialogProps) {
   const theme = useTheme()
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -54,19 +56,7 @@ function AddMeterDialog({ open, onClose, onSubmit }: AddMeterDialogProps) {
   const [error, setError] = useState<string | null>(null)
   const [scraped, setScraped] = useState<ScrapedBill | null>(null)
   const [name, setName] = useState('')
-  const [unitLimit, setUnitLimit] = useState('200')
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      setRefno('')
-      setLoading(false)
-      setError(null)
-      setScraped(null)
-      setName('')
-      setUnitLimit('200')
-    }
-  }, [open])
 
   const refTrimmed = refno.replace(/\s+/g, '')
 
@@ -95,7 +85,7 @@ function AddMeterDialog({ open, onClose, onSubmit }: AddMeterDialogProps) {
           company: scraped.company,
           referenceNumber: scraped.referenceNumber,
           cycleStartDay: cycleStartFromReadingDate(scraped.readingDate),
-          unitLimit: Math.max(1, Number(unitLimit) || 200),
+          unitLimit,
         },
         scraped,
       )
@@ -166,13 +156,6 @@ function AddMeterDialog({ open, onClose, onSubmit }: AddMeterDialogProps) {
             <Alert severity="info" variant="outlined">
               Billing cycle will reset on day <b>{cycleDay}</b> each month (from the reading date).
             </Alert>
-            <TextField
-              label="Unit limit (protected slab)"
-              value={unitLimit}
-              onChange={(e) => setUnitLimit(e.target.value)}
-              fullWidth
-              inputMode="numeric"
-            />
           </Stack>
         )}
       </DialogContent>

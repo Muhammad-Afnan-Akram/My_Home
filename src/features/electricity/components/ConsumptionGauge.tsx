@@ -1,18 +1,9 @@
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import CircularProgress from '@mui/material/CircularProgress'
+import { consumptionStatus, type ConsumptionStatus } from '../utils/consumption'
 
-type Status = 'safe' | 'warning' | 'over'
-
-export function consumptionStatus(unitsUsed: number | null, limit: number): Status {
-  if (unitsUsed == null) return 'safe'
-  const ratio = unitsUsed / limit
-  if (ratio >= 1) return 'over'
-  if (ratio >= 0.8) return 'warning'
-  return 'safe'
-}
-
-const COLOR: Record<Status, 'success' | 'warning' | 'error'> = {
+const COLOR: Record<ConsumptionStatus, 'success' | 'warning' | 'error'> = {
   safe: 'success',
   warning: 'warning',
   over: 'error',
@@ -26,11 +17,12 @@ interface ConsumptionGaugeProps {
 
 /** Circular gauge: remaining units in the centre, ring fills as you consume. */
 function ConsumptionGauge({ unitsUsed, limit, size = 132 }: ConsumptionGaugeProps) {
+  const hasLimit = limit > 0
   const status = consumptionStatus(unitsUsed, limit)
   const color = COLOR[status]
   const used = unitsUsed ?? 0
-  const pct = Math.min(100, Math.round((used / limit) * 100))
-  const remaining = unitsUsed == null ? null : limit - used
+  const pct = hasLimit ? Math.min(100, Math.round((used / limit) * 100)) : 0
+  const remaining = unitsUsed == null || !hasLimit ? null : limit - used
 
   return (
     <Box sx={{ position: 'relative', display: 'inline-flex' }}>
@@ -59,12 +51,26 @@ function ConsumptionGauge({ unitsUsed, limit, size = 132 }: ConsumptionGaugeProp
           justifyContent: 'center',
         }}
       >
-        {remaining == null ? (
+        {unitsUsed == null ? (
           <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
             No
             <br />
             readings
           </Typography>
+        ) : !hasLimit ? (
+          <>
+            <Typography
+              variant="h4"
+              component="div"
+              color="text.primary"
+              sx={{ fontWeight: 700, lineHeight: 1 }}
+            >
+              {used}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              units used
+            </Typography>
+          </>
         ) : (
           <>
             <Typography
@@ -76,7 +82,7 @@ function ConsumptionGauge({ unitsUsed, limit, size = 132 }: ConsumptionGaugeProp
               {remaining}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {remaining >= 0 ? 'units left' : 'over limit'}
+              {remaining != null && remaining >= 0 ? 'units left' : 'over limit'}
             </Typography>
           </>
         )}

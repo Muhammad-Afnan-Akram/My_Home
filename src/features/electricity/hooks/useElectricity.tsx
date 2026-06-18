@@ -1,41 +1,27 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BillInfo, Meter, Reading, ScrapedBill } from '../types'
 import { electricityRepo, fetchScrapedBill } from '../data'
 import type { MeterPatch, NewMeter, NewReading } from '../data'
+import { ElectricityContext, type ElectricityState } from './electricityContext'
 
 /** Auto-refresh a meter's bill if its data is older than this (~2x/24h). */
 const REFRESH_MS = 12 * 60 * 60 * 1000
 
-interface ElectricityState {
-  loading: boolean
-  error: string | null
-  meters: Meter[]
-  readings: Reading[]
-  bills: Record<string, BillInfo>
-  /** Meter ids whose bill is currently being fetched from the portal. */
-  fetchingIds: ReadonlySet<string>
-  addMeter: (input: NewMeter) => Promise<Meter>
-  /** Create a meter and persist an already-fetched bill + its reading. */
-  addMeterFromBill: (input: NewMeter, scraped: ScrapedBill) => Promise<Meter>
-  updateMeter: (id: string, patch: MeterPatch) => Promise<void>
-  deleteMeter: (id: string) => Promise<void>
-  addReading: (input: NewReading) => Promise<void>
-  deleteReading: (id: string) => Promise<void>
-  saveBill: (bill: BillInfo) => Promise<void>
-  /** Fetch + parse the official bill, save it, and record its reading. */
-  fetchBill: (meter: Meter) => Promise<void>
-}
+/** Global protected-slab limit, applied to every meter. Stored per-device. */
+const UNIT_LIMIT_KEY = 'myhome.electricity.unitLimit'
+const DEFAULT_UNIT_LIMIT = 200
 
-const ElectricityContext = createContext<ElectricityState | null>(null)
+function readUnitLimit(): number {
+  try {
+    const raw = localStorage.getItem(UNIT_LIMIT_KEY)
+    if (raw == null) return DEFAULT_UNIT_LIMIT
+    const n = Number(raw)
+    // 0 is a valid stored value meaning "no slab limit".
+    return Number.isFinite(n) && n >= 0 ? n : DEFAULT_UNIT_LIMIT
+  } catch {
+    return DEFAULT_UNIT_LIMIT
+  }
+}
 
 export function ElectricityProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
@@ -44,14 +30,31 @@ export function ElectricityProvider({ children }: { children: ReactNode }) {
   const [readings, setReadings] = useState<Reading[]>([])
   const [bills, setBills] = useState<Record<string, BillInfo>>({})
   const [fetchingIds, setFetchingIds] = useState<ReadonlySet<string>>(new Set())
+  const [unitLimit, setUnitLimitState] = useState<number>(readUnitLimit)
+
+  const setUnitLimit = useCallback((limit: number) => {
+    const rounded = Math.round(limit)
+    // 0 means "no slab limit"; anything invalid falls back to the default.
+    const next = Number.isFinite(rounded) && rounded >= 0 ? rounded : DEFAULT_UNIT_LIMIT
+    setUnitLimitState(next)
+    try {
+      localStorage.setItem(UNIT_LIMIT_KEY, String(next))
+    } catch {
+      /* non-fatal: keep the in-memory value */
+    }
+  }, [])
 
   // Refs so the background refresh pass and the concurrency guard can read
-  // current values without re-creating callbacks.
+  // current values without re-creating callbacks. Synced in an effect rather
+  // than during render (refs must not be mutated while rendering).
   const fetchingRef = useRef<Set<string>>(new Set())
   const metersRef = useRef<Meter[]>(meters)
-  metersRef.current = meters
   const billsRef = useRef<Record<string, BillInfo>>(bills)
-  billsRef.current = bills
+
+  useEffect(() => {
+    metersRef.current = meters
+    billsRef.current = bills
+  }, [meters, bills])
 
   useEffect(() => {
     let active = true
@@ -212,6 +215,8 @@ export function ElectricityProvider({ children }: { children: ReactNode }) {
       readings,
       bills,
       fetchingIds,
+      unitLimit,
+      setUnitLimit,
       addMeter,
       addMeterFromBill,
       updateMeter,
@@ -228,6 +233,8 @@ export function ElectricityProvider({ children }: { children: ReactNode }) {
       readings,
       bills,
       fetchingIds,
+      unitLimit,
+      setUnitLimit,
       addMeter,
       addMeterFromBill,
       updateMeter,
@@ -240,10 +247,4 @@ export function ElectricityProvider({ children }: { children: ReactNode }) {
   )
 
   return <ElectricityContext.Provider value={value}>{children}</ElectricityContext.Provider>
-}
-
-export function useElectricity(): ElectricityState {
-  const ctx = useContext(ElectricityContext)
-  if (!ctx) throw new Error('useElectricity must be used within an ElectricityProvider')
-  return ctx
 }

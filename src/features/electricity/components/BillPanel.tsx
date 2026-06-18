@@ -22,6 +22,8 @@ import { billUrlFor } from '../utils/billing'
 interface BillPanelProps {
   meter: Meter
   bill?: BillInfo
+  /** Global protected-slab limit applied to every meter. */
+  unitLimit: number
   /** Trigger an auto-fetch from the portal; resolves when saved, throws on error. */
   onFetch: () => Promise<void>
   onSave: (bill: BillInfo) => Promise<void> | void
@@ -77,7 +79,7 @@ function History({ history, limit }: { history: MonthlyUnit[]; limit: number }) 
   )
 }
 
-function BillPanel({ meter, bill, onFetch, onSave }: BillPanelProps) {
+function BillPanel({ meter, bill, unitLimit, onFetch, onSave }: BillPanelProps) {
   const url = meter.billUrl || billUrlFor(meter.company, meter.referenceNumber)
   const [editing, setEditing] = useState(false)
   const [fetching, setFetching] = useState(false)
@@ -163,7 +165,7 @@ function BillPanel({ meter, bill, onFetch, onSave }: BillPanelProps) {
         {bill?.history && bill.history.length > 0 && (
           <>
             <Divider sx={{ my: 2 }} />
-            <History history={bill.history} limit={meter.unitLimit} />
+            <History history={bill.history} limit={unitLimit} />
           </>
         )}
 

@@ -9,7 +9,7 @@ import Button from '@mui/material/Button'
 import Alert from '@mui/material/Alert'
 import Link from '@mui/material/Link'
 import BoltIcon from '@mui/icons-material/Bolt'
-import { useAuth } from './AuthProvider'
+import { useAuth } from './authContext'
 
 type Mode = 'login' | 'signup' | 'forgot'
 

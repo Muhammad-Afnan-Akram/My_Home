@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -18,6 +18,8 @@ import { billUrlFor } from '../utils/billing'
 interface MeterFormDialogProps {
   open: boolean
   initial?: Meter
+  /** Global protected-slab limit applied to every meter (stored on save). */
+  unitLimit: number
   onClose: () => void
   onSubmit: (values: NewMeter) => Promise<unknown> | void
 }
@@ -27,29 +29,25 @@ const EMPTY = {
   company: 'mepco' as DiscoCode,
   referenceNumber: '',
   cycleStartDay: '1',
-  unitLimit: '200',
 }
 
-function MeterFormDialog({ open, initial, onClose, onSubmit }: MeterFormDialogProps) {
+/** Build the form's initial values from a meter (or blanks for a new one). */
+function formFromMeter(initial?: Meter): typeof EMPTY {
+  return initial
+    ? {
+        name: initial.name,
+        company: initial.company,
+        referenceNumber: initial.referenceNumber,
+        cycleStartDay: String(initial.cycleStartDay),
+      }
+    : EMPTY
+}
+
+function MeterFormDialog({ open, initial, unitLimit, onClose, onSubmit }: MeterFormDialogProps) {
   const theme = useTheme()
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'))
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState(() => formFromMeter(initial))
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    setForm(
-      initial
-        ? {
-            name: initial.name,
-            company: initial.company,
-            referenceNumber: initial.referenceNumber,
-            cycleStartDay: String(initial.cycleStartDay),
-            unitLimit: String(initial.unitLimit),
-          }
-        : EMPTY,
-    )
-  }, [open, initial])
 
   const set = (key: keyof typeof EMPTY) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -66,7 +64,7 @@ function MeterFormDialog({ open, initial, onClose, onSubmit }: MeterFormDialogPr
         company: form.company,
         referenceNumber: refTrimmed,
         cycleStartDay: Math.min(28, Math.max(1, Number(form.cycleStartDay) || 1)),
-        unitLimit: Math.max(1, Number(form.unitLimit) || 200),
+        unitLimit,
       })
       onClose()
     } finally {
@@ -101,24 +99,14 @@ function MeterFormDialog({ open, initial, onClose, onSubmit }: MeterFormDialogPr
             fullWidth
             inputMode="numeric"
           />
-          <Stack direction="row" spacing={2}>
-            <TextField
-              label="Billing cycle start day"
-              helperText="1–28 (from your bill)"
-              value={form.cycleStartDay}
-              onChange={set('cycleStartDay')}
-              fullWidth
-              inputMode="numeric"
-            />
-            <TextField
-              label="Unit limit"
-              helperText="Protected slab"
-              value={form.unitLimit}
-              onChange={set('unitLimit')}
-              fullWidth
-              inputMode="numeric"
-            />
-          </Stack>
+          <TextField
+            label="Billing cycle start day"
+            helperText="1–28 (from your bill)"
+            value={form.cycleStartDay}
+            onChange={set('cycleStartDay')}
+            fullWidth
+            inputMode="numeric"
+          />
           {refTrimmed && (
             <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
               Bill URL: {billUrlFor(form.company, refTrimmed)}

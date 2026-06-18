@@ -15,12 +15,15 @@ import DialogContentText from '@mui/material/DialogContentText'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
+import Alert from '@mui/material/Alert'
+import AlertTitle from '@mui/material/AlertTitle'
 import AddIcon from '@mui/icons-material/Add'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import { ROUTES } from '@/constants'
 import { Screen } from '@/components'
-import { useElectricity } from '../hooks/useElectricity'
+import { useElectricity } from '../hooks/electricityContext'
 import { computeCycleConsumption } from '../utils/billing'
+import { formatLongDate, isCurrentMonthISO } from '../utils/date'
 import {
   AddReadingDialog,
   BillPanel,
@@ -39,6 +42,7 @@ function MeterDetailPage() {
     readings,
     bills,
     fetchingIds,
+    unitLimit,
     updateMeter,
     deleteMeter,
     addReading,
@@ -57,6 +61,16 @@ function MeterDetailPage() {
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [addingReading, setAddingReading] = useState(false)
+  // Bump on open so each dialog remounts fresh (re-reads props) without a reset effect.
+  const [openSeq, setOpenSeq] = useState(0)
+  const openEditing = () => {
+    setOpenSeq((n) => n + 1)
+    setEditing(true)
+  }
+  const openAddReading = () => {
+    setOpenSeq((n) => n + 1)
+    setAddingReading(true)
+  }
 
   // Auto-fetch the bill the first time an empty meter is opened.
   const autoTried = useRef<Set<string>>(new Set())
@@ -93,8 +107,13 @@ function MeterDetailPage() {
     )
   }
 
-  const consumption = computeCycleConsumption(meter, meterReadings, undefined, bills[meter.id])
+  const bill = bills[meter.id]
+  const consumption = computeCycleConsumption(meter, meterReadings, undefined, bill, unitLimit)
   const latestValue = consumption.latestValue
+
+  // The bill we're calculating from isn't this month's — flag usage as estimated.
+  const isLatestBill = Boolean(bill?.issueDate && isCurrentMonthISO(bill.issueDate))
+  const estimated = consumption.anchoredToBill && !isLatestBill
 
   const handleDelete = async () => {
     await deleteMeter(meter.id)
@@ -125,9 +144,27 @@ function MeterDetailPage() {
           </Box>
         )}
 
-        <CycleSummary meter={meter} consumption={consumption} />
+        {estimated && (
+          <Alert
+            severity="warning"
+            icon={false}
+            sx={{ borderRadius: 3, border: '1px solid', borderColor: 'warning.main' }}
+          >
+            <AlertTitle sx={{ fontWeight: 700 }}>⚠ Estimated Data</AlertTitle>
+            No newer MEPCO bill is available yet. Current usage is being calculated using the
+            last official bill dated {formatLongDate(consumption.cycleStart)}.
+          </Alert>
+        )}
 
-        <BillPanel meter={meter} bill={bills[meter.id]} onFetch={() => fetchBill(meter)} onSave={saveBill} />
+        <CycleSummary consumption={consumption} unitLimit={unitLimit} estimated={estimated} />
+
+        <BillPanel
+          meter={meter}
+          bill={bills[meter.id]}
+          unitLimit={unitLimit}
+          onFetch={() => fetchBill(meter)}
+          onSave={saveBill}
+        />
 
         <Box>
           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -141,7 +178,7 @@ function MeterDetailPage() {
         color="primary"
         variant="extended"
         aria-label="add reading"
-        onClick={() => setAddingReading(true)}
+        onClick={openAddReading}
         sx={{ position: 'fixed', bottom: 24, right: 24 }}
       >
         <AddIcon sx={{ mr: 1 }} />
@@ -152,7 +189,7 @@ function MeterDetailPage() {
         <MenuItem
           onClick={() => {
             setMenuAnchor(null)
-            setEditing(true)
+            openEditing()
           }}
         >
           Edit meter
@@ -169,13 +206,16 @@ function MeterDetailPage() {
       </Menu>
 
       <MeterFormDialog
+        key={`edit-${openSeq}`}
         open={editing}
         initial={meter}
+        unitLimit={unitLimit}
         onClose={() => setEditing(false)}
         onSubmit={(values) => updateMeter(meter.id, values)}
       />
 
       <AddReadingDialog
+        key={`reading-${openSeq}`}
         open={addingReading}
         meterId={meter.id}
         lastValue={latestValue}

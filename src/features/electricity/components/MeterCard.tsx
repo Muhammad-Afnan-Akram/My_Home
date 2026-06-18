@@ -12,10 +12,11 @@ import BoltIcon from '@mui/icons-material/Bolt'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import type { BillInfo, Meter, Reading } from '../types'
-import { DISCOS } from '../types'
 import { computeCycleConsumption } from '../utils/billing'
-import { daysBetween, todayISO, formatRelative, isCurrentMonthISO } from '../utils/date'
-import ConsumptionGauge, { consumptionStatus } from './ConsumptionGauge'
+import { daysBetween, todayISO, formatRelative, formatLongDate, isCurrentMonthISO } from '../utils/date'
+import { consumptionStatus } from '../utils/consumption'
+import { discoLabel } from '../utils/disco'
+import ConsumptionGauge from './ConsumptionGauge'
 
 const STATUS_LABEL = {
   safe: 'On track',
@@ -29,14 +30,12 @@ const STATUS_COLOR = {
   over: 'error',
 } as const
 
-export function discoLabel(code: Meter['company']): string {
-  return DISCOS.find((d) => d.code === code)?.label ?? code.toUpperCase()
-}
-
 interface MeterCardProps {
   meter: Meter
   readings: Reading[]
   fetching?: boolean
+  /** Global protected-slab limit applied to every meter. */
+  unitLimit: number
   /** Latest bill snapshot — anchors the consumption cycle when present. */
   bill?: BillInfo | null
   /** ISO timestamp of the last successful bill update, if any. */
@@ -54,6 +53,7 @@ function MeterCard({
   meter,
   readings,
   fetching = false,
+  unitLimit,
   bill,
   lastUpdated,
   billMonth,
@@ -62,18 +62,21 @@ function MeterCard({
   onRefresh,
   onDelete,
 }: MeterCardProps) {
-  const c = computeCycleConsumption(meter, readings, undefined, bill)
-  const status = consumptionStatus(c.unitsUsed, meter.unitLimit)
+  const c = computeCycleConsumption(meter, readings, undefined, bill, unitLimit)
+  const status = consumptionStatus(c.unitsUsed, unitLimit)
   const daysLeft = Math.max(0, daysBetween(todayISO(), c.cycleEnd))
 
   // Latest if the bill was issued in the current calendar month.
   const isLatest = Boolean(issueDate && isCurrentMonthISO(issueDate))
+  // Calculations lean on an old bill when we're anchored to one that isn't
+  // this month's — surface that as an estimate rather than official data.
+  const estimated = c.anchoredToBill && !isLatest
 
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
       <CardActionArea onClick={onClick} sx={{ p: 2 }}>
         <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-          <ConsumptionGauge unitsUsed={c.unitsUsed} limit={meter.unitLimit} size={96} />
+          <ConsumptionGauge unitsUsed={c.unitsUsed} limit={unitLimit} size={96} />
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
               <BoltIcon fontSize="small" color="warning" />
@@ -87,7 +90,16 @@ function MeterCard({
             <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
               Ref: {meter.referenceNumber}
             </Typography>
-            <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: 'center' }}>
+            {c.anchoredToBill && (
+              <Typography
+                variant="caption"
+                noWrap
+                sx={{ display: 'block', color: 'text.disabled', fontSize: '0.68rem' }}
+              >
+                Last Official Bill: {formatLongDate(c.cycleStart)}
+              </Typography>
+            )}
+            <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
               {fetching ? (
                 <>
                   <CircularProgress size={14} />
@@ -97,31 +109,48 @@ function MeterCard({
                 </>
               ) : (
                 <>
-                  <Chip
-                    size="small"
-                    label={STATUS_LABEL[status]}
-                    color={STATUS_COLOR[status]}
-                    variant={status === 'safe' ? 'outlined' : 'filled'}
-                  />
+                  {unitLimit > 0 && (
+                    <Chip
+                      size="small"
+                      label={STATUS_LABEL[status]}
+                      color={STATUS_COLOR[status]}
+                      variant={status === 'safe' ? 'outlined' : 'filled'}
+                    />
+                  )}
                   <Typography variant="caption" color="text.secondary">
                     {c.unitsUsed == null
-                      ? `Limit ${meter.unitLimit}`
-                      : `${c.unitsUsed} / ${meter.unitLimit} · ${daysLeft}d left`}
+                      ? unitLimit > 0
+                        ? `Limit ${unitLimit}`
+                        : 'No limit set'
+                      : unitLimit > 0
+                        ? `${c.unitsUsed} / ${unitLimit} · ${daysLeft}d left`
+                        : `${c.unitsUsed} units · ${daysLeft}d left`}
                   </Typography>
+                  {estimated && (
+                    <Chip
+                      size="small"
+                      color="warning"
+                      variant="outlined"
+                      label="⚠ Estimated from last bill"
+                    />
+                  )}
                 </>
               )}
             </Stack>
             {(billMonth || issueDate) && (
               <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                 {billMonth && <Chip size="small" variant="outlined" label={`Bill: ${billMonth}`} />}
-                {issueDate && (
-                  <Chip
-                    size="small"
-                    color={isLatest ? 'success' : 'warning'}
-                    variant="filled"
-                    label={isLatest ? 'Latest' : 'Outdated'}
-                  />
-                )}
+                {issueDate &&
+                  (isLatest ? (
+                    <Chip size="small" color="success" variant="filled" label="Latest" />
+                  ) : (
+                    <Chip
+                      size="small"
+                      color="warning"
+                      variant="filled"
+                      label="Waiting for next bill"
+                    />
+                  ))}
               </Stack>
             )}
           </Box>

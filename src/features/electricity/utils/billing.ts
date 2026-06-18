@@ -74,6 +74,7 @@ export function computeCycleConsumption(
   readings: Reading[],
   ref: string = todayISO(),
   bill?: BillInfo | null,
+  limit: number = meter.unitLimit,
 ): CycleConsumption {
   const sorted = [...readings].sort((a, b) => a.date.localeCompare(b.date))
 
@@ -115,14 +116,16 @@ export function computeCycleConsumption(
     unitsUsed = Math.max(0, latestValue - baselineValue)
   }
 
-  const unitsRemaining = unitsUsed == null ? null : meter.unitLimit - unitsUsed
+  // limit <= 0 means no protected-slab limit is set, so nothing to exceed.
+  const hasLimit = limit > 0
+  const unitsRemaining = unitsUsed == null || !hasLimit ? null : limit - unitsUsed
 
   const dailyAverage = unitsUsed == null ? null : unitsUsed / daysElapsed
   // Project over a full cycle; once we're past the expected next reading date
   // the projection is just the units already used (a full cycle of data).
   const projectedUnits =
     dailyAverage == null ? null : Math.round(dailyAverage * Math.max(daysInCycle, daysElapsed))
-  const projectedToExceed = projectedUnits != null && projectedUnits > meter.unitLimit
+  const projectedToExceed = hasLimit && projectedUnits != null && projectedUnits > limit
 
   return {
     cycleStart,

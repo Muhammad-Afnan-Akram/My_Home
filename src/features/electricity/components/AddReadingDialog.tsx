@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -24,14 +24,6 @@ function AddReadingDialog({ open, meterId, lastValue, onClose, onSubmit }: AddRe
   const [value, setValue] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      setDate(todayISO())
-      setValue('')
-      setNote('')
-    }
-  }, [open])
 
   const numeric = Number(value)
   const hasValue = value.trim().length > 0 && !Number.isNaN(numeric)

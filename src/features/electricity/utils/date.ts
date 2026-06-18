@@ -49,6 +49,15 @@ export function formatShort(iso: string): string {
   })
 }
 
+/** Full human-friendly date, e.g. "15 May 2026". */
+export function formatLongDate(iso: string): string {
+  return fromISODate(iso).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
 /** True if an ISO date (yyyy-mm-dd) falls in the same month as `ref` (now). */
 export function isCurrentMonthISO(iso: string, ref: Date = new Date()): boolean {
   const d = fromISODate(iso)
