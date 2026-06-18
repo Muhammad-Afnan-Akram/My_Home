@@ -38,7 +38,7 @@ interface ModuleDef {
 const MODULES: ModuleDef[] = [
   { key: 'electricity', title: 'Electricity', icon: BoltIcon, color: '#f59e0b', route: ROUTES.electricity },
   { key: 'car', title: 'Car', icon: DirectionsCarIcon, color: '#3b82f6' },
-  { key: 'bike', title: 'Bike Tuning', icon: TwoWheelerIcon, color: '#10b981' },
+  { key: 'bike', title: 'Bike Tuning', icon: TwoWheelerIcon, color: '#10b981', route: ROUTES.bikes },
   { key: 'water', title: 'Water', icon: WaterDropIcon, color: '#06b6d4' },
 ]
 

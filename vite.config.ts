@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { getBill, BillFetchError } from './server/billScraper'
 import { handleDbOp } from './server/electricityDb'
+import { handleBikeOp } from './server/bikeDb'
 import { getUserId, AuthError } from './server/auth'
 
 function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -61,6 +62,30 @@ function billApiPlugin(): Plugin {
           const userId = await getUserId(req.headers.authorization)
           const body = await readJsonBody(req)
           const result = await handleDbOp(
+            String(body.op),
+            (body.payload as Record<string, unknown>) ?? {},
+            userId,
+          )
+          res.statusCode = 200
+          res.end(JSON.stringify(result ?? null))
+        } catch (err) {
+          res.statusCode = err instanceof AuthError ? 401 : 500
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Database error.' }))
+        }
+      })
+
+      // Bike Tuning API: POST /api/bike { op, payload } backed by Supabase Postgres.
+      server.middlewares.use('/api/bike', async (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end(JSON.stringify({ error: 'Method not allowed' }))
+          return
+        }
+        try {
+          const userId = await getUserId(req.headers.authorization)
+          const body = await readJsonBody(req)
+          const result = await handleBikeOp(
             String(body.op),
             (body.payload as Record<string, unknown>) ?? {},
             userId,

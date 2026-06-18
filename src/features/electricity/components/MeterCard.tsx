@@ -11,9 +11,11 @@ import CircularProgress from '@mui/material/CircularProgress'
 import BoltIcon from '@mui/icons-material/Bolt'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
+import EventIcon from '@mui/icons-material/Event'
+import PaymentsIcon from '@mui/icons-material/Payments'
 import type { BillInfo, Meter, Reading } from '../types'
 import { computeCycleConsumption } from '../utils/billing'
-import { daysBetween, todayISO, formatRelative, formatLongDate, isCurrentMonthISO } from '../utils/date'
+import { daysBetween, todayISO, formatRelative, formatLongDate, formatShort, isCurrentMonthISO } from '../utils/date'
 import { consumptionStatus } from '../utils/consumption'
 import { discoLabel } from '../utils/disco'
 import ConsumptionGauge from './ConsumptionGauge'
@@ -154,6 +156,50 @@ function MeterCard({
               </Stack>
             )}
           </Box>
+          {isLatest && bill && (
+            <Stack spacing={0.75} sx={{ alignItems: 'flex-end', flexShrink: 0 }}>
+              <Typography
+                variant="overline"
+                color="text.secondary"
+                sx={{ lineHeight: 1.4, fontWeight: 700, letterSpacing: 0.5 }}
+              >
+                Current bill
+              </Typography>
+              {bill.units != null && (
+                <Tooltip title="Units consumed">
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color="warning"
+                    icon={<BoltIcon />}
+                    label={`${bill.units} units`}
+                  />
+                </Tooltip>
+              )}
+              {bill.dueDate && (
+                <Tooltip title="Pay within this date">
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    icon={<EventIcon />}
+                    label={`Due ${formatShort(bill.dueDate)}`}
+                  />
+                </Tooltip>
+              )}
+              {bill.amountDue != null && (
+                <Tooltip title="Payable within due date">
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    icon={<PaymentsIcon />}
+                    label={`Rs ${bill.amountDue.toLocaleString()}`}
+                  />
+                </Tooltip>
+              )}
+            </Stack>
+          )}
         </Stack>
       </CardActionArea>
 

@@ -42,39 +42,101 @@ function Row({ label, value }: { label: string; value?: string | number }) {
   )
 }
 
-/** Compact bar chart of recent monthly consumption. */
+/**
+ * Mobile-first list of every month available on the bill. Each row is a
+ * full-width horizontal bar coloured against the protected-slab limit, with a
+ * dashed marker showing where that limit falls. Scales to any month count.
+ */
 function History({ history, limit }: { history: MonthlyUnit[]; limit: number }) {
-  const recent = history.slice(-6)
-  const max = Math.max(limit, ...recent.map((h) => h.units), 1)
+  // Bill history is oldest-first; show newest at the top for an "at a glance"
+  // recent view.
+  const months = [...history].reverse()
+  const max = Math.max(limit, ...months.map((h) => h.units), 1)
+  const limitPct = limit > 0 ? Math.min(100, (limit / max) * 100) : null
+  const avg = Math.round(months.reduce((sum, h) => sum + h.units, 0) / months.length)
+
   return (
     <Box>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Recent months
-      </Typography>
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-end', height: 88 }}>
-        {recent.map((h) => {
-          const over = h.units > limit
-          const near = !over && h.units >= limit * 0.8
+      <Stack
+        direction="row"
+        sx={{ alignItems: 'baseline', justifyContent: 'space-between', mb: 1.5 }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          Recent months
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {months.length} months · avg {avg}
+        </Typography>
+      </Stack>
+
+      <Stack spacing={1}>
+        {months.map((h) => {
+          const over = limit > 0 && h.units > limit
+          const near = limit > 0 && !over && h.units >= limit * 0.8
+          const color = over ? 'error.main' : near ? 'warning.main' : 'success.main'
+          const pct = Math.max(2, (h.units / max) * 100)
           return (
-            <Stack key={h.month} sx={{ flex: 1, alignItems: 'center' }} spacing={0.5}>
-              <Typography variant="caption" sx={{ fontWeight: 600, fontSize: 10 }}>
-                {h.units}
+            <Stack key={h.month} direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+              <Typography
+                variant="caption"
+                noWrap
+                sx={{ width: 56, flexShrink: 0, fontWeight: 600, color: 'text.secondary' }}
+              >
+                {h.month}
               </Typography>
               <Box
                 sx={{
-                  width: '100%',
-                  height: `${Math.max(4, (h.units / max) * 56)}px`,
+                  position: 'relative',
+                  flex: 1,
+                  minWidth: 0,
+                  height: 22,
                   borderRadius: 1,
-                  bgcolor: over ? 'error.main' : near ? 'warning.main' : 'success.main',
+                  bgcolor: 'action.hover',
+                  overflow: 'hidden',
                 }}
-              />
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
-                {h.month}
+              >
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    width: `${pct}%`,
+                    bgcolor: color,
+                    borderRadius: 1,
+                    transition: 'width .3s ease',
+                  }}
+                />
+                {limitPct != null && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: -1,
+                      bottom: -1,
+                      left: `${limitPct}%`,
+                      borderLeft: '2px dashed',
+                      borderColor: 'text.secondary',
+                      opacity: 0.5,
+                    }}
+                  />
+                )}
+              </Box>
+              <Typography
+                variant="caption"
+                sx={{ width: 44, flexShrink: 0, textAlign: 'right', fontWeight: 700 }}
+              >
+                {h.units}
               </Typography>
             </Stack>
           )
         })}
       </Stack>
+
+      {limitPct != null && (
+        <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 1.25 }}>
+          ┊ dashed line marks the {limit}-unit limit
+        </Typography>
+      )}
     </Box>
   )
 }

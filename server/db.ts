@@ -67,6 +67,31 @@ create table if not exists bills (
   source text,
   updated_at timestamptz not null default now()
 );
+create table if not exists bikes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid,
+  company text not null,
+  model text not null,
+  registration_number text not null,
+  current_meter double precision not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists bikes_user_idx on bikes(user_id);
+create table if not exists tunings (
+  id uuid primary key default gen_random_uuid(),
+  bike_id uuid not null references bikes(id) on delete cascade,
+  date date not null,
+  meter_reading double precision not null,
+  cost double precision not null default 0,
+  description text,
+  created_at timestamptz not null default now()
+);
+create index if not exists tunings_bike_idx on tunings(bike_id);
+create table if not exists bike_settings (
+  user_id uuid primary key,
+  tuning_interval_km int not null default 1000,
+  updated_at timestamptz not null default now()
+);
 `
 
 let schemaReady: Promise<void> | null = null
