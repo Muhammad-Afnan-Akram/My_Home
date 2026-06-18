@@ -1,7 +1,7 @@
 // Vercel serverless function: POST /api/db { op, payload }
 // Requires a Supabase auth token; scopes all data to that user.
-import { handleDbOp } from '../server/electricityDb'
-import { getUserId, AuthError } from '../server/auth'
+import { handleDbOp } from '../server/electricityDb.js'
+import { getUserId, AuthError } from '../server/auth.js'
 
 interface Req {
   method?: string

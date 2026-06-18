@@ -1,6 +1,6 @@
 // Data access for the Electricity module, backed by Supabase Postgres.
 // Returns objects already shaped like the frontend types (camelCase).
-import { query } from './db'
+import { query } from './db.js'
 
 interface Meter {
   id: string

@@ -1,8 +1,8 @@
 // Vercel serverless function: GET /api/bill?company=&refno=
 // Shares the scraper with the Vite dev middleware (see vite.config.ts).
 // Requires a Supabase auth token. Typed loosely (no @vercel/node dep).
-import { getBill, BillFetchError } from '../server/billScraper'
-import { getUserId, AuthError } from '../server/auth'
+import { getBill, BillFetchError } from '../server/billScraper.js'
+import { getUserId, AuthError } from '../server/auth.js'
 
 interface Req {
   query: Record<string, string | string[] | undefined>
