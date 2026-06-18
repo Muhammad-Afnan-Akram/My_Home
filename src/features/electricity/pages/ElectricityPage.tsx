@@ -7,6 +7,7 @@ import Fab from '@mui/material/Fab'
 import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -41,6 +42,15 @@ function ElectricityPage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Meter | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+
+  // Refresh from the card's button. Catch failures (expired session, portal
+  // down) so they surface as a toast instead of an uncaught promise rejection.
+  const handleRefresh = (meter: Meter) => {
+    void fetchBill(meter).catch((err) =>
+      setRefreshError(err instanceof Error ? err.message : 'Failed to refresh bill.'),
+    )
+  }
   // Bump on open so each dialog remounts fresh (re-reads props) without a reset effect.
   const [openSeq, setOpenSeq] = useState(0)
   const openAdding = () => {
@@ -108,7 +118,7 @@ function ElectricityPage() {
               billMonth={bills[meter.id]?.billMonth}
               issueDate={bills[meter.id]?.issueDate}
               onClick={() => navigate(ROUTES.meter(meter.id))}
-              onRefresh={() => fetchBill(meter)}
+              onRefresh={() => handleRefresh(meter)}
               onDelete={() => setDeleteTarget(meter)}
             />
           ))}
@@ -159,6 +169,17 @@ function ElectricityPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={Boolean(refreshError)}
+        autoHideDuration={6000}
+        onClose={() => setRefreshError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" variant="filled" onClose={() => setRefreshError(null)}>
+          {refreshError}
+        </Alert>
+      </Snackbar>
     </Screen>
   )
 }
