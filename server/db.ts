@@ -98,12 +98,16 @@ create table if not exists cars (
   make text not null,
   model text not null,
   variant text not null default '',
+  year int,
+  service_interval_km int,
   color text,
   image_url text,
   registration_number text not null,
   current_meter double precision not null default 0,
   created_at timestamptz not null default now()
 );
+alter table cars add column if not exists year int;
+alter table cars add column if not exists service_interval_km int;
 create index if not exists cars_user_idx on cars(user_id);
 create table if not exists car_services (
   id uuid primary key default gen_random_uuid(),

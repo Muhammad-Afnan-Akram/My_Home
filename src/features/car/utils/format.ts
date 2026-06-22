@@ -1,6 +1,6 @@
 // Small formatting + date helpers for the Car module. Works with
 // `yyyy-mm-dd` strings to avoid timezone surprises.
-import type { CarService } from '../types'
+import type { Car, CarService } from '../types'
 
 /** Today's date as a local `yyyy-mm-dd` string. */
 export function todayISO(): string {
@@ -74,6 +74,14 @@ export function serviceStatus(
   // Flag the last 15% of the interval as a heads-up before it's actually due.
   const level: ServiceLevel = remaining <= 0 ? 'over' : pct >= 85 ? 'warning' : 'safe'
   return { intervalKm, sinceLast, remaining, pct, level, overdue: remaining <= 0 }
+}
+
+/**
+ * The oil-change interval that applies to a car: its own `serviceIntervalKm`
+ * when set (> 0), otherwise the global default.
+ */
+export function effectiveInterval(car: Car, globalKm: number): number {
+  return car.serviceIntervalKm && car.serviceIntervalKm > 0 ? car.serviceIntervalKm : globalKm
 }
 
 /** The most recent oil-change reading for a car's services, or null. */

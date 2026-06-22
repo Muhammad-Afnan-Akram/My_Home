@@ -12,7 +12,14 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
 import type { Car, CarService } from '../types'
-import { formatDate, formatKm, formatRs, lastOilChangeReading, serviceStatus } from '../utils/format'
+import {
+  effectiveInterval,
+  formatDate,
+  formatKm,
+  formatRs,
+  lastOilChangeReading,
+  serviceStatus,
+} from '../utils/format'
 import ServiceGauge from './ServiceGauge'
 
 const ACCENT = '#3b82f6'
@@ -31,7 +38,8 @@ interface CarCardProps {
 function CarCard({ car, services, oilChangeIntervalKm, onClick, onEdit, onDelete }: CarCardProps) {
   const lastService = services[0]
   const lastOil = lastOilChangeReading(services)
-  const status = serviceStatus(oilChangeIntervalKm, car.currentMeter, lastOil)
+  const interval = effectiveInterval(car, oilChangeIntervalKm)
+  const status = serviceStatus(interval, car.currentMeter, lastOil)
   const totalSpent = services.reduce((sum, s) => sum + s.cost, 0)
 
   return (
@@ -73,9 +81,9 @@ function CarCard({ car, services, oilChangeIntervalKm, onClick, onEdit, onDelete
               </Typography>
             </Stack>
 
-            {car.variant && (
+            {(car.variant || car.year) && (
               <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                {car.variant}
+                {[car.year, car.variant].filter(Boolean).join(' · ')}
               </Typography>
             )}
 

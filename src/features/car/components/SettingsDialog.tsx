@@ -45,8 +45,10 @@ function SettingsDialog({ open, oilChangeIntervalKm, onClose, onSave }: Settings
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            The oil-change interval applies to every car. We'll flag a car as due once it's been
-            driven this far since its last oil change, or turn it off to just log services.
+            This is the default oil-change interval. It's used for any car that doesn't have its own
+            interval set (you can set a per-car interval when adding or editing a car). We'll flag a
+            car as due once it's been driven this far since its last oil change, or turn it off to
+            just log services.
           </Typography>
           <FormControlLabel
             control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}

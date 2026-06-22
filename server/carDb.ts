@@ -7,6 +7,8 @@ interface Car {
   make: string
   model: string
   variant: string
+  year?: number
+  serviceIntervalKm?: number
   color?: string
   imageUrl?: string
   registrationNumber: string
@@ -49,6 +51,8 @@ function mapCar(r: Row): Car {
     make: String(r.make),
     model: String(r.model),
     variant: String(r.variant ?? ''),
+    year: num(r.year),
+    serviceIntervalKm: num(r.service_interval_km),
     color: str(r.color),
     imageUrl: str(r.image_url),
     registrationNumber: String(r.registration_number),
@@ -92,13 +96,15 @@ export async function addCar(
   userId: string,
 ): Promise<Car> {
   const rows = await query(
-    `insert into cars (user_id, make, model, variant, color, image_url, registration_number, current_meter)
-     values ($1,$2,$3,$4,$5,$6,$7,$8) returning *`,
+    `insert into cars (user_id, make, model, variant, year, service_interval_km, color, image_url, registration_number, current_meter)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
     [
       userId,
       input.make,
       input.model,
       input.variant ?? '',
+      input.year ?? null,
+      input.serviceIntervalKm ?? null,
       input.color ?? null,
       input.imageUrl ?? null,
       input.registrationNumber,
@@ -112,6 +118,8 @@ const CAR_COLUMNS: Record<string, string> = {
   make: 'make',
   model: 'model',
   variant: 'variant',
+  year: 'year',
+  serviceIntervalKm: 'service_interval_km',
   color: 'color',
   imageUrl: 'image_url',
   registrationNumber: 'registration_number',

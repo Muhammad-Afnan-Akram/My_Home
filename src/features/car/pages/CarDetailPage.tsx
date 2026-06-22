@@ -27,6 +27,7 @@ import { useCar } from '../hooks/carContext'
 import type { CarService } from '../types'
 import { AddServiceDialog, ServiceList, UpdateMeterDialog, ServiceGauge } from '../components'
 import {
+  effectiveInterval,
   formatDate,
   formatKm,
   formatRs,
@@ -84,7 +85,8 @@ function CarDetailPage() {
   const lastService = carServices[0]
   const lastOil = lastOilChangeReading(carServices)
   const sinceOil = car && lastOil != null ? Math.max(0, car.currentMeter - lastOil) : null
-  const status = car ? serviceStatus(oilChangeIntervalKm, car.currentMeter, lastOil) : null
+  const interval = car ? effectiveInterval(car, oilChangeIntervalKm) : oilChangeIntervalKm
+  const status = car ? serviceStatus(interval, car.currentMeter, lastOil) : null
 
   const confirmDelete = async () => {
     if (!deleteTarget) return
@@ -162,9 +164,9 @@ function CarDetailPage() {
               <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>
                 {car.make} {car.model}
               </Typography>
-              {car.variant && (
+              {(car.variant || car.year) && (
                 <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                  {car.variant}
+                  {[car.year, car.variant].filter(Boolean).join(' · ')}
                 </Typography>
               )}
               <Stack direction="row" spacing={0.75} sx={{ mt: 0.25, flexWrap: 'wrap', rowGap: 0.5 }}>
@@ -218,8 +220,8 @@ function CarDetailPage() {
             </Stack>
             {status?.overdue && (
               <Alert severity="warning" sx={{ mt: 2 }}>
-                This car is {formatKm(-status.remaining)} past its {formatKm(oilChangeIntervalKm)}{' '}
-                oil-change interval.
+                This car is {formatKm(-status.remaining)} past its {formatKm(interval)} oil-change
+                interval.
               </Alert>
             )}
           </Box>

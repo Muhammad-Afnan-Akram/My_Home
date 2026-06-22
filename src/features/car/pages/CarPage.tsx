@@ -171,6 +171,7 @@ function CarPage() {
         key={`form-${openSeq}`}
         open={formOpen}
         initial={editTarget ?? undefined}
+        defaultIntervalKm={oilChangeIntervalKm}
         onClose={() => setFormOpen(false)}
         onSubmit={handleSubmit}
       />

@@ -7,6 +7,7 @@ import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
 import Autocomplete from '@mui/material/Autocomplete'
+import InputAdornment from '@mui/material/InputAdornment'
 import Stack from '@mui/material/Stack'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
@@ -25,6 +26,8 @@ const ACCENT = '#3b82f6'
 interface CarFormDialogProps {
   open: boolean
   initial?: Car
+  /** Global default oil-change interval (km), shown as the fallback hint. */
+  defaultIntervalKm: number
   onClose: () => void
   onSubmit: (values: NewCar) => Promise<unknown> | void
 }
@@ -40,6 +43,8 @@ function formFromCar(initial?: Car) {
       modelOther: '',
       variant: '',
       variantOther: '',
+      year: '',
+      serviceIntervalKm: '',
       color: '',
       imageUrl: '',
       registrationNumber: '',
@@ -56,6 +61,8 @@ function formFromCar(initial?: Car) {
     modelOther: modelKnown ? '' : initial.model,
     variant: variantKnown ? initial.variant : initial.variant ? OTHER : '',
     variantOther: variantKnown ? '' : initial.variant,
+    year: initial.year ? String(initial.year) : '',
+    serviceIntervalKm: initial.serviceIntervalKm ? String(initial.serviceIntervalKm) : '',
     color: initial.color ?? '',
     imageUrl: initial.imageUrl ?? '',
     registrationNumber: initial.registrationNumber,
@@ -63,13 +70,17 @@ function formFromCar(initial?: Car) {
   }
 }
 
-function CarFormDialog({ open, initial, onClose, onSubmit }: CarFormDialogProps) {
+function CarFormDialog({ open, initial, defaultIntervalKm, onClose, onSubmit }: CarFormDialogProps) {
   const theme = useTheme()
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'))
   const fileInput = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState(() => formFromCar(initial))
   const [saving, setSaving] = useState(false)
   const [imageError, setImageError] = useState<string | null>(null)
+
+  // Years offered in the dropdown: current year down to 1980.
+  const currentYear = new Date().getFullYear()
+  const years = Array.from({ length: currentYear - 1979 }, (_, i) => currentYear - i)
 
   // Resolve the chosen make/model/variant to their final string values.
   const make = form.make === OTHER ? form.makeOther.trim() : form.make
@@ -104,10 +115,14 @@ function CarFormDialog({ open, initial, onClose, onSubmit }: CarFormDialogProps)
     setSaving(true)
     try {
       const meter = Number(form.currentMeter)
+      const year = Number(form.year)
+      const interval = Number(form.serviceIntervalKm)
       await onSubmit({
         make,
         model,
         variant,
+        year: Number.isFinite(year) && year > 0 ? year : undefined,
+        serviceIntervalKm: Number.isFinite(interval) && interval > 0 ? interval : undefined,
         color: form.color.trim() || undefined,
         imageUrl: form.imageUrl || undefined,
         registrationNumber: form.registrationNumber.trim(),
@@ -266,6 +281,25 @@ function CarFormDialog({ open, initial, onClose, onSubmit }: CarFormDialogProps)
             />
           )}
 
+          {/* Make year */}
+          <TextField
+            select
+            label="Year"
+            value={form.year}
+            onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))}
+            fullWidth
+            helperText="Make / model year, optional"
+          >
+            <MenuItem value="">
+              <em>Not set</em>
+            </MenuItem>
+            {years.map((y) => (
+              <MenuItem key={y} value={String(y)}>
+                {y}
+              </MenuItem>
+            ))}
+          </TextField>
+
           {/* Colour — free text with suggestions */}
           <Autocomplete
             freeSolo
@@ -293,6 +327,21 @@ function CarFormDialog({ open, initial, onClose, onSubmit }: CarFormDialogProps)
             fullWidth
             inputMode="numeric"
             helperText="Optional — current odometer reading"
+          />
+
+          <TextField
+            label="Oil-change interval (km)"
+            value={form.serviceIntervalKm}
+            onChange={(e) => setForm((f) => ({ ...f, serviceIntervalKm: e.target.value }))}
+            fullWidth
+            inputMode="numeric"
+            placeholder={String(defaultIntervalKm)}
+            helperText={`How often this car needs an oil change. Leave blank to use the default (${defaultIntervalKm.toLocaleString()} km).`}
+            slotProps={{
+              input: {
+                endAdornment: <InputAdornment position="end">km</InputAdornment>,
+              },
+            }}
           />
         </Stack>
       </DialogContent>

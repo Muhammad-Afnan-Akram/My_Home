@@ -29,6 +29,7 @@ export const CAR_MAKES: CarMake[] = [
           'Altis Grande 1.8 CVT',
           'Altis 1.8 CVT',
           'Altis 1.6 X',
+          'Altis 1.6 Crustonic',
           'Altis 1.6 MT',
           'GLi 1.3 VVTi MT',
           'GLi 1.3 Automatic',
@@ -278,6 +279,13 @@ export interface Car {
   model: string
   /** Variant / trim, e.g. "Altis Grande 1.8 CVT". */
   variant: string
+  /** Model / make year, e.g. 2019 (optional). */
+  year?: number
+  /**
+   * Oil-change interval (km) for *this* car. Overrides the global default when
+   * set (> 0); falls back to the global default when 0 / undefined.
+   */
+  serviceIntervalKm?: number
   /** Exterior colour (optional). */
   color?: string
   /** Photo of the car as a data URL (optional). */
