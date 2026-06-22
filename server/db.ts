@@ -124,9 +124,11 @@ create table if not exists car_services (
   air_filter_changed boolean not null default false,
   fuel_filter_changed boolean not null default false,
   ac_filter_changed boolean not null default false,
+  coolant_changed boolean not null default false,
   description text,
   created_at timestamptz not null default now()
 );
+alter table car_services add column if not exists coolant_changed boolean not null default false;
 create index if not exists car_services_car_idx on car_services(car_id);
 create table if not exists car_settings (
   user_id uuid primary key,

@@ -5,7 +5,6 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
-import Autocomplete from '@mui/material/Autocomplete'
 import Stack from '@mui/material/Stack'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
@@ -23,6 +22,7 @@ import type { NewCarService } from '../data'
 import type { ServiceType } from '../types'
 import { OIL_BRANDS, OIL_GRADES, SERVICE_TYPES } from '../types'
 import { todayISO } from '../utils/format'
+import SelectWithOther from './SelectWithOther'
 
 const ACCENT = '#3b82f6'
 
@@ -74,6 +74,7 @@ function AddServiceDialog({ open, carId, currentMeter, onClose, onSubmit }: AddS
   const [airFilter, setAirFilter] = useState(false)
   const [fuelFilter, setFuelFilter] = useState(false)
   const [acFilter, setAcFilter] = useState(false)
+  const [coolant, setCoolant] = useState(false)
 
   const [saving, setSaving] = useState(false)
 
@@ -102,6 +103,7 @@ function AddServiceDialog({ open, carId, currentMeter, onClose, onSubmit }: AddS
         airFilterChanged: airFilter,
         fuelFilterChanged: fuelFilter,
         acFilterChanged: acFilter,
+        coolantChanged: coolant,
         description: description.trim() || undefined,
       })
       onClose()
@@ -167,25 +169,23 @@ function AddServiceDialog({ open, carId, currentMeter, onClose, onSubmit }: AddS
             />
             <Collapse in={oilChanged} unmountOnExit>
               <Stack spacing={2} sx={{ mt: 1, pl: 0.5 }}>
-                <Stack direction="row" spacing={2}>
-                  <Autocomplete
-                    freeSolo
-                    fullWidth
-                    options={OIL_BRANDS}
-                    value={oilBrand}
-                    onChange={(_, v) => setOilBrand(v ?? '')}
-                    onInputChange={(_, v) => setOilBrand(v)}
-                    renderInput={(params) => <TextField {...params} label="Oil brand" />}
-                  />
-                  <Autocomplete
-                    freeSolo
-                    fullWidth
-                    options={OIL_GRADES}
-                    value={oilGrade}
-                    onChange={(_, v) => setOilGrade(v ?? '')}
-                    onInputChange={(_, v) => setOilGrade(v)}
-                    renderInput={(params) => <TextField {...params} label="Grade" />}
-                  />
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
+                  <Box sx={{ flex: 1 }}>
+                    <SelectWithOther
+                      label="Oil brand"
+                      value={oilBrand}
+                      onChange={setOilBrand}
+                      options={OIL_BRANDS}
+                    />
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <SelectWithOther
+                      label="Grade"
+                      value={oilGrade}
+                      onChange={setOilGrade}
+                      options={OIL_GRADES}
+                    />
+                  </Box>
                 </Stack>
                 <TextField
                   label="Quantity"
@@ -212,6 +212,15 @@ function AddServiceDialog({ open, carId, currentMeter, onClose, onSubmit }: AddS
               <FilterChip label="Air filter" selected={airFilter} onToggle={() => setAirFilter((v) => !v)} />
               <FilterChip label="Fuel filter" selected={fuelFilter} onToggle={() => setFuelFilter((v) => !v)} />
               <FilterChip label="AC filter" selected={acFilter} onToggle={() => setAcFilter((v) => !v)} />
+            </Stack>
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+              Fluids
+            </Typography>
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+              <FilterChip label="Coolant" selected={coolant} onToggle={() => setCoolant((v) => !v)} />
             </Stack>
           </Box>
 

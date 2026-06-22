@@ -6,7 +6,6 @@ import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
 import MenuItem from '@mui/material/MenuItem'
-import Autocomplete from '@mui/material/Autocomplete'
 import InputAdornment from '@mui/material/InputAdornment'
 import Stack from '@mui/material/Stack'
 import Box from '@mui/material/Box'
@@ -20,6 +19,7 @@ import type { Car } from '../types'
 import { CAR_COLORS, CAR_MAKES, OTHER, modelsForMake, variantsFor } from '../types'
 import type { NewCar } from '../data'
 import { fileToResizedDataUrl } from '../utils/image'
+import SelectWithOther from './SelectWithOther'
 
 const ACCENT = '#3b82f6'
 
@@ -300,16 +300,13 @@ function CarFormDialog({ open, initial, defaultIntervalKm, onClose, onSubmit }: 
             ))}
           </TextField>
 
-          {/* Colour — free text with suggestions */}
-          <Autocomplete
-            freeSolo
-            options={CAR_COLORS}
+          {/* Colour — pick from the list or choose "Other…" to type one */}
+          <SelectWithOther
+            label="Colour"
             value={form.color}
-            onChange={(_, value) => setForm((f) => ({ ...f, color: value ?? '' }))}
-            onInputChange={(_, value) => setForm((f) => ({ ...f, color: value }))}
-            renderInput={(params) => (
-              <TextField {...params} label="Colour" helperText="Optional" fullWidth />
-            )}
+            onChange={(value) => setForm((f) => ({ ...f, color: value }))}
+            options={CAR_COLORS}
+            helperText="Optional"
           />
 
           <TextField

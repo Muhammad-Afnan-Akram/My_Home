@@ -243,6 +243,7 @@ export const OIL_BRANDS = [
   'Caltex Havoline',
   'Castrol',
   'PSO Carlube',
+  'QALCO Q6',
   'Liqui Moly',
   'Mobil',
   'Wolf',
@@ -348,6 +349,8 @@ export interface CarService {
   fuelFilterChanged: boolean
   /** Whether the AC / cabin filter was replaced. */
   acFilterChanged: boolean
+  /** Whether the coolant / antifreeze was changed or topped up. */
+  coolantChanged: boolean
   /** Free-text notes — work done, parts, observations. */
   description?: string
   createdAt: string

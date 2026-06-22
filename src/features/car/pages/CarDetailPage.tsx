@@ -33,6 +33,7 @@ import {
   formatRs,
   lastOilChangeReading,
   serviceStatus,
+  sortServicesByDate,
 } from '../utils/format'
 
 /** Blue accent that signs the car module across the app. */
@@ -61,7 +62,7 @@ function CarDetailPage() {
 
   const car = cars.find((c) => c.id === carId)
   const carServices = useMemo(
-    () => services.filter((s) => s.carId === carId),
+    () => sortServicesByDate(services.filter((s) => s.carId === carId)),
     [services, carId],
   )
 

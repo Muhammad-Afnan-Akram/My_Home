@@ -31,6 +31,7 @@ interface CarService {
   airFilterChanged: boolean
   fuelFilterChanged: boolean
   acFilterChanged: boolean
+  coolantChanged: boolean
   description?: string
   createdAt: string
 }
@@ -77,6 +78,7 @@ function mapService(r: Row): CarService {
     airFilterChanged: Boolean(r.air_filter_changed),
     fuelFilterChanged: Boolean(r.fuel_filter_changed),
     acFilterChanged: Boolean(r.ac_filter_changed),
+    coolantChanged: Boolean(r.coolant_changed),
     description: str(r.description),
     createdAt: iso(r.created_at),
   }
@@ -84,7 +86,8 @@ function mapService(r: Row): CarService {
 
 const SERVICE_COLS = `s.id, s.car_id, to_char(s.date, 'YYYY-MM-DD') as date, s.meter_reading, s.type,
   s.cost, s.oil_changed, s.oil_brand, s.oil_grade, s.oil_liters, s.oil_filter_changed,
-  s.air_filter_changed, s.fuel_filter_changed, s.ac_filter_changed, s.description, s.created_at`
+  s.air_filter_changed, s.fuel_filter_changed, s.ac_filter_changed, s.coolant_changed,
+  s.description, s.created_at`
 
 export async function getCars(userId: string): Promise<Car[]> {
   const rows = await query('select * from cars where user_id = $1 order by created_at asc', [userId])
@@ -182,9 +185,9 @@ export async function addService(
   const rows = await query(
     `insert into car_services (car_id, date, meter_reading, type, cost, oil_changed, oil_brand,
        oil_grade, oil_liters, oil_filter_changed, air_filter_changed, fuel_filter_changed,
-       ac_filter_changed, description)
-     select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
-     where exists (select 1 from cars where id = $1 and user_id = $15)
+       ac_filter_changed, coolant_changed, description)
+     select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+     where exists (select 1 from cars where id = $1 and user_id = $16)
      returning ${SERVICE_COLS.replace(/\bs\./g, '')}`,
     [
       input.carId,
@@ -200,6 +203,7 @@ export async function addService(
       input.airFilterChanged ?? false,
       input.fuelFilterChanged ?? false,
       input.acFilterChanged ?? false,
+      input.coolantChanged ?? false,
       input.description ?? null,
       userId,
     ],

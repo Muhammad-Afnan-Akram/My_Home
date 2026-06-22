@@ -19,6 +19,7 @@ import {
   formatRs,
   lastOilChangeReading,
   serviceStatus,
+  sortServicesByDate,
 } from '../utils/format'
 import ServiceGauge from './ServiceGauge'
 
@@ -36,8 +37,9 @@ interface CarCardProps {
 }
 
 function CarCard({ car, services, oilChangeIntervalKm, onClick, onEdit, onDelete }: CarCardProps) {
-  const lastService = services[0]
-  const lastOil = lastOilChangeReading(services)
+  const sorted = sortServicesByDate(services)
+  const lastService = sorted[0]
+  const lastOil = lastOilChangeReading(sorted)
   const interval = effectiveInterval(car, oilChangeIntervalKm)
   const status = serviceStatus(interval, car.currentMeter, lastOil)
   const totalSpent = services.reduce((sum, s) => sum + s.cost, 0)

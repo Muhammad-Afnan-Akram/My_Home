@@ -77,6 +77,17 @@ export function serviceStatus(
 }
 
 /**
+ * Services sorted most-recent first: by date (desc), then by when the record
+ * was created (desc) to keep same-day entries stable. Returns a new array.
+ */
+export function sortServicesByDate(services: CarService[]): CarService[] {
+  return [...services].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1
+    return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0
+  })
+}
+
+/**
  * The oil-change interval that applies to a car: its own `serviceIntervalKm`
  * when set (> 0), otherwise the global default.
  */
@@ -108,5 +119,6 @@ export function summarizeParts(s: CarService): string {
   if (s.airFilterChanged) parts.push('Air filter')
   if (s.fuelFilterChanged) parts.push('Fuel filter')
   if (s.acFilterChanged) parts.push('AC filter')
+  if (s.coolantChanged) parts.push('Coolant')
   return parts.join(' · ')
 }
