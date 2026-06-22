@@ -92,6 +92,43 @@ create table if not exists bike_settings (
   tuning_interval_km int not null default 1000,
   updated_at timestamptz not null default now()
 );
+create table if not exists cars (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid,
+  make text not null,
+  model text not null,
+  variant text not null default '',
+  color text,
+  image_url text,
+  registration_number text not null,
+  current_meter double precision not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists cars_user_idx on cars(user_id);
+create table if not exists car_services (
+  id uuid primary key default gen_random_uuid(),
+  car_id uuid not null references cars(id) on delete cascade,
+  date date not null,
+  meter_reading double precision not null,
+  type text not null default 'service',
+  cost double precision not null default 0,
+  oil_changed boolean not null default false,
+  oil_brand text,
+  oil_grade text,
+  oil_liters double precision,
+  oil_filter_changed boolean not null default false,
+  air_filter_changed boolean not null default false,
+  fuel_filter_changed boolean not null default false,
+  ac_filter_changed boolean not null default false,
+  description text,
+  created_at timestamptz not null default now()
+);
+create index if not exists car_services_car_idx on car_services(car_id);
+create table if not exists car_settings (
+  user_id uuid primary key,
+  oil_change_interval_km int not null default 5000,
+  updated_at timestamptz not null default now()
+);
 `
 
 let schemaReady: Promise<void> | null = null

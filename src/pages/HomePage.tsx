@@ -30,16 +30,44 @@ import { useInstallPrompt } from '@/pwa/useInstallPrompt'
 interface ModuleDef {
   key: string
   title: string
+  desc: string
   icon: SvgIconComponent
   color: string
   route?: string
 }
 
 const MODULES: ModuleDef[] = [
-  { key: 'electricity', title: 'Electricity', icon: BoltIcon, color: '#f59e0b', route: ROUTES.electricity },
-  { key: 'car', title: 'Car', icon: DirectionsCarIcon, color: '#3b82f6' },
-  { key: 'bike', title: 'Bike Tuning', icon: TwoWheelerIcon, color: '#10b981', route: ROUTES.bikes },
-  { key: 'water', title: 'Water', icon: WaterDropIcon, color: '#06b6d4' },
+  {
+    key: 'electricity',
+    title: 'Electricity',
+    desc: 'Meters, bills & usage',
+    icon: BoltIcon,
+    color: '#f59e0b',
+    route: ROUTES.electricity,
+  },
+  {
+    key: 'car',
+    title: 'Car',
+    desc: 'Services, oil & repairs',
+    icon: DirectionsCarIcon,
+    color: '#3b82f6',
+    route: ROUTES.cars,
+  },
+  {
+    key: 'bike',
+    title: 'Bike Tuning',
+    desc: 'Tunings & meter',
+    icon: TwoWheelerIcon,
+    color: '#10b981',
+    route: ROUTES.bikes,
+  },
+  {
+    key: 'water',
+    title: 'Water',
+    desc: 'Coming soon',
+    icon: WaterDropIcon,
+    color: '#06b6d4',
+  },
 ]
 
 function HomePage() {
@@ -84,29 +112,62 @@ function HomePage() {
           const Icon = mod.icon
           const enabled = Boolean(mod.route)
           return (
-            <Card key={mod.key} variant="outlined" sx={{ borderRadius: 3, opacity: enabled ? 1 : 0.6 }}>
+            <Card
+              key={mod.key}
+              variant="outlined"
+              sx={{
+                borderRadius: 3,
+                height: '100%',
+                opacity: enabled ? 1 : 0.7,
+                transition: 'box-shadow .2s, transform .2s, border-color .2s',
+                ...(enabled && {
+                  '&:hover': {
+                    boxShadow: 6,
+                    transform: 'translateY(-3px)',
+                    borderColor: mod.color,
+                  },
+                }),
+              }}
+            >
               <CardActionArea
                 disabled={!enabled}
                 onClick={() => mod.route && navigate(mod.route)}
-                sx={{ p: 2, height: '100%' }}
+                sx={{
+                  height: '100%',
+                  p: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'stretch',
+                  justifyContent: 'flex-start',
+                  // Subtle accent wash so each tile reads as its module's colour.
+                  background: `linear-gradient(150deg, ${mod.color}14, transparent 70%)`,
+                }}
               >
-                <Stack spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+                <Stack spacing={1.25} sx={{ height: 150, alignItems: 'flex-start' }}>
                   <Box
                     sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 2,
+                      width: 52,
+                      height: 52,
+                      borderRadius: 2.5,
                       display: 'grid',
                       placeItems: 'center',
                       bgcolor: `${mod.color}22`,
+                      color: mod.color,
                     }}
                   >
-                    <Icon sx={{ color: mod.color }} />
+                    <Icon sx={{ fontSize: 28 }} />
                   </Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  <Box sx={{ flex: 1 }} />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
                     {mod.title}
                   </Typography>
-                  {!enabled && <Chip size="small" label="Coming soon" variant="outlined" />}
+                  {enabled ? (
+                    <Typography variant="caption" color="text.secondary">
+                      {mod.desc}
+                    </Typography>
+                  ) : (
+                    <Chip size="small" label="Coming soon" variant="outlined" />
+                  )}
                 </Stack>
               </CardActionArea>
             </Card>

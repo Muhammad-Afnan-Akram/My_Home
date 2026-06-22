@@ -7,4 +7,6 @@ export const ROUTES = {
   meter: (id: string) => `/electricity/${id}`,
   bikes: '/bikes',
   bike: (id: string) => `/bikes/${id}`,
+  cars: '/cars',
+  car: (id: string) => `/cars/${id}`,
 } as const

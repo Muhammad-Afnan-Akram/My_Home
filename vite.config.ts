@@ -6,6 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { getBill, fetchBillDocument, BillFetchError } from './server/billScraper'
 import { handleDbOp } from './server/electricityDb'
 import { handleBikeOp } from './server/bikeDb'
+import { handleCarOp } from './server/carDb'
 import { getUserId, AuthError } from './server/auth'
 
 function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -104,6 +105,30 @@ function billApiPlugin(): Plugin {
           const userId = await getUserId(req.headers.authorization)
           const body = await readJsonBody(req)
           const result = await handleBikeOp(
+            String(body.op),
+            (body.payload as Record<string, unknown>) ?? {},
+            userId,
+          )
+          res.statusCode = 200
+          res.end(JSON.stringify(result ?? null))
+        } catch (err) {
+          res.statusCode = err instanceof AuthError ? 401 : 500
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Database error.' }))
+        }
+      })
+
+      // Car API: POST /api/car { op, payload } backed by Supabase Postgres.
+      server.middlewares.use('/api/car', async (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end(JSON.stringify({ error: 'Method not allowed' }))
+          return
+        }
+        try {
+          const userId = await getUserId(req.headers.authorization)
+          const body = await readJsonBody(req)
+          const result = await handleCarOp(
             String(body.op),
             (body.payload as Record<string, unknown>) ?? {},
             userId,
