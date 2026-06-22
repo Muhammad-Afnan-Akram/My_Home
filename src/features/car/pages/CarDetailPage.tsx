@@ -11,6 +11,7 @@ import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
 import CircularProgress from '@mui/material/CircularProgress'
+import LinearProgress from '@mui/material/LinearProgress'
 import Alert from '@mui/material/Alert'
 import Snackbar from '@mui/material/Snackbar'
 import Dialog from '@mui/material/Dialog'
@@ -286,6 +287,7 @@ function CarDetailPage() {
 
       <Dialog open={Boolean(deleteTarget)} onClose={() => !deleting && setDeleteTarget(null)}>
         <DialogTitle>Delete this service?</DialogTitle>
+        {deleting && <LinearProgress />}
         <DialogContent>
           <DialogContentText>
             The service from {deleteTarget ? formatDate(deleteTarget.date) : ''} will be permanently

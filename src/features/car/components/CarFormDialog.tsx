@@ -11,6 +11,7 @@ import Stack from '@mui/material/Stack'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
 import Alert from '@mui/material/Alert'
+import LinearProgress from '@mui/material/LinearProgress'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import AddAPhotoOutlinedIcon from '@mui/icons-material/AddAPhotoOutlined'
@@ -137,6 +138,7 @@ function CarFormDialog({ open, initial, defaultIntervalKm, onClose, onSubmit }: 
   return (
     <Dialog open={open} onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="sm">
       <DialogTitle>{initial ? 'Edit car' : 'Add car'}</DialogTitle>
+      {saving && <LinearProgress />}
       <DialogContent>
         <Stack spacing={2.5} sx={{ mt: 1 }}>
           {/* Photo picker */}

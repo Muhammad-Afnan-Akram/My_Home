@@ -8,6 +8,7 @@ import TextField from '@mui/material/TextField'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import Alert from '@mui/material/Alert'
+import LinearProgress from '@mui/material/LinearProgress'
 import InputAdornment from '@mui/material/InputAdornment'
 
 interface UpdateMeterDialogProps {
@@ -44,6 +45,7 @@ function UpdateMeterDialog({ open, currentMeter, onClose, onSubmit }: UpdateMete
   return (
     <Dialog open={open} onClose={() => !saving && onClose()} fullWidth maxWidth="xs">
       <DialogTitle>Update meter reading</DialogTitle>
+      {saving && <LinearProgress />}
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Typography variant="body2" color="text.secondary">

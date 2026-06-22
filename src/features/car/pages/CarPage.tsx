@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography'
 import Fab from '@mui/material/Fab'
 import Button from '@mui/material/Button'
 import CircularProgress from '@mui/material/CircularProgress'
+import LinearProgress from '@mui/material/LinearProgress'
 import Alert from '@mui/material/Alert'
 import Snackbar from '@mui/material/Snackbar'
 import Dialog from '@mui/material/Dialog'
@@ -186,6 +187,7 @@ function CarPage() {
 
       <Dialog open={Boolean(deleteTarget)} onClose={() => !deleting && setDeleteTarget(null)}>
         <DialogTitle>Delete this car?</DialogTitle>
+        {deleting && <LinearProgress />}
         <DialogContent>
           <DialogContentText>
             “{deleteTarget?.make} {deleteTarget?.model}” and all its service history will be

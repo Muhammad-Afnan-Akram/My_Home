@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
 import Alert from '@mui/material/Alert'
 import Collapse from '@mui/material/Collapse'
+import LinearProgress from '@mui/material/LinearProgress'
 import Switch from '@mui/material/Switch'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import InputAdornment from '@mui/material/InputAdornment'
@@ -115,6 +116,7 @@ function AddServiceDialog({ open, carId, currentMeter, onClose, onSubmit }: AddS
   return (
     <Dialog open={open} onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="sm">
       <DialogTitle>Add service</DialogTitle>
+      {saving && <LinearProgress />}
       <DialogContent>
         <Stack spacing={2.5} sx={{ mt: 1 }}>
           {/* Type */}
