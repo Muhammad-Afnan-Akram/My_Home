@@ -146,6 +146,7 @@ function CarPage() {
               onClick={() => navigate(ROUTES.car(car.id))}
               onEdit={() => openEdit(car)}
               onDelete={() => setDeleteTarget(car)}
+              onReport={() => navigate(ROUTES.carReport(car.id))}
             />
           ))}
         </Stack>

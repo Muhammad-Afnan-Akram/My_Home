@@ -5,7 +5,7 @@ import MainLayout from '@/layouts/MainLayout'
 import HomePage from '@/pages/HomePage'
 import { ElectricityProvider, ElectricityPage, MeterDetailPage } from '@/features/electricity'
 import { BikeProvider, BikePage, BikeDetailPage } from '@/features/bike'
-import { CarProvider, CarPage, CarDetailPage } from '@/features/car'
+import { CarProvider, CarPage, CarDetailPage, CarReportPage } from '@/features/car'
 import { useAuth, AuthPage } from '@/features/auth'
 
 function App() {
@@ -38,6 +38,7 @@ function App() {
               <Route path="/bikes/:bikeId" element={<BikeDetailPage />} />
               <Route path="/cars" element={<CarPage />} />
               <Route path="/cars/:carId" element={<CarDetailPage />} />
+              <Route path="/cars/:carId/report" element={<CarReportPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </MainLayout>

@@ -11,6 +11,7 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
+import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined'
 import type { Car, CarService } from '../types'
 import {
   effectiveInterval,
@@ -34,9 +35,18 @@ interface CarCardProps {
   onClick: () => void
   onEdit: () => void
   onDelete: () => void
+  onReport: () => void
 }
 
-function CarCard({ car, services, oilChangeIntervalKm, onClick, onEdit, onDelete }: CarCardProps) {
+function CarCard({
+  car,
+  services,
+  oilChangeIntervalKm,
+  onClick,
+  onEdit,
+  onDelete,
+  onReport,
+}: CarCardProps) {
   const sorted = sortServicesByDate(services)
   const lastService = sorted[0]
   const lastOil = lastOilChangeReading(sorted)
@@ -132,6 +142,11 @@ function CarCard({ car, services, oilChangeIntervalKm, onClick, onEdit, onDelete
           </Typography>
         )}
         <Box sx={{ flex: 1 }} />
+        <Tooltip title="Service report">
+          <IconButton size="small" aria-label="report" onClick={onReport} sx={{ color: ACCENT }}>
+            <SummarizeOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Edit car">
           <IconButton size="small" aria-label="edit" onClick={onEdit}>
             <EditOutlinedIcon fontSize="small" />

@@ -21,6 +21,7 @@ import DialogContentText from '@mui/material/DialogContentText'
 import DialogActions from '@mui/material/DialogActions'
 import AddIcon from '@mui/icons-material/Add'
 import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
+import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined'
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar'
 import { ROUTES } from '@/constants'
 import { Screen } from '@/components'
@@ -127,7 +128,17 @@ function CarDetailPage() {
   }
 
   return (
-    <Screen title={`${car.make} ${car.model}`} back={ROUTES.cars}>
+    <Screen
+      title={`${car.make} ${car.model}`}
+      back={ROUTES.cars}
+      actions={
+        <Tooltip title="Service report">
+          <IconButton aria-label="service report" onClick={() => navigate(ROUTES.carReport(car.id))}>
+            <SummarizeOutlinedIcon />
+          </IconButton>
+        </Tooltip>
+      }
+    >
       <Stack spacing={2} sx={{ pb: 10 }}>
         <Card variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
           {car.imageUrl && (

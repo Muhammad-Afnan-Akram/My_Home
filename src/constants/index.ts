@@ -9,4 +9,5 @@ export const ROUTES = {
   bike: (id: string) => `/bikes/${id}`,
   cars: '/cars',
   car: (id: string) => `/cars/${id}`,
+  carReport: (id: string) => `/cars/${id}/report`,
 } as const
