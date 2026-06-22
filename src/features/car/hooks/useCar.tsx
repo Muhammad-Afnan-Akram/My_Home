@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Car, CarService } from '../types'
 import { carRepo } from '../data'
-import type { CarPatch, NewCar, NewCarService } from '../data'
+import type { CarPatch, CarServicePatch, NewCar, NewCarService } from '../data'
 import { CarContext, type CarState } from './carContext'
 
 /** Default oil-change interval, applied to every car. Cached per-device. */
@@ -104,6 +104,19 @@ export function CarProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
+  const updateService = useCallback(async (id: string, patch: CarServicePatch) => {
+    const updated = await carRepo.updateService(id, patch)
+    setServices((prev) => prev.map((s) => (s.id === id ? updated : s)))
+    // Keep the car's odometer in sync if the corrected reading is higher.
+    setCars((prev) =>
+      prev.map((c) =>
+        c.id === updated.carId
+          ? { ...c, currentMeter: Math.max(c.currentMeter, updated.meterReading) }
+          : c,
+      ),
+    )
+  }, [])
+
   const deleteService = useCallback(async (id: string) => {
     await carRepo.deleteService(id)
     setServices((prev) => prev.filter((s) => s.id !== id))
@@ -119,6 +132,7 @@ export function CarProvider({ children }: { children: ReactNode }) {
       updateCar,
       deleteCar,
       addService,
+      updateService,
       deleteService,
       oilChangeIntervalKm,
       setOilChangeInterval,
@@ -132,6 +146,7 @@ export function CarProvider({ children }: { children: ReactNode }) {
       updateCar,
       deleteCar,
       addService,
+      updateService,
       deleteService,
       oilChangeIntervalKm,
       setOilChangeInterval,

@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Car, CarService } from '../types'
-import type { CarPatch, NewCar, NewCarService } from '../data'
+import type { CarPatch, CarServicePatch, NewCar, NewCarService } from '../data'
 
 export interface CarState {
   loading: boolean
@@ -11,6 +11,7 @@ export interface CarState {
   updateCar: (id: string, patch: CarPatch) => Promise<void>
   deleteCar: (id: string) => Promise<void>
   addService: (input: NewCarService) => Promise<void>
+  updateService: (id: string, patch: CarServicePatch) => Promise<void>
   deleteService: (id: string) => Promise<void>
   /** Default distance (km) between oil changes; 0 = not tracked. */
   oilChangeIntervalKm: number

@@ -218,6 +218,67 @@ export async function addService(
   return mapService(rows[0])
 }
 
+const SERVICE_COLUMNS: Record<string, string> = {
+  date: 'date',
+  meterReading: 'meter_reading',
+  type: 'type',
+  cost: 'cost',
+  oilChanged: 'oil_changed',
+  oilBrand: 'oil_brand',
+  oilGrade: 'oil_grade',
+  oilLiters: 'oil_liters',
+  oilFilterChanged: 'oil_filter_changed',
+  airFilterChanged: 'air_filter_changed',
+  fuelFilterChanged: 'fuel_filter_changed',
+  acFilterChanged: 'ac_filter_changed',
+  coolantChanged: 'coolant_changed',
+  description: 'description',
+}
+
+const SERVICE_RETURN = SERVICE_COLS.replace(/\bs\./g, '')
+
+export async function updateService(
+  id: string,
+  patch: Record<string, unknown>,
+  userId: string,
+): Promise<CarService> {
+  const sets: string[] = []
+  const values: unknown[] = []
+  for (const [key, column] of Object.entries(SERVICE_COLUMNS)) {
+    if (key in patch) {
+      values.push(patch[key])
+      sets.push(`${column} = $${values.length}`)
+    }
+  }
+  if (sets.length === 0) {
+    const rows = await query(
+      `select ${SERVICE_COLS} from car_services s join cars c on c.id = s.car_id
+       where s.id = $1 and c.user_id = $2`,
+      [id, userId],
+    )
+    if (!rows.length) throw new Error('Service not found.')
+    return mapService(rows[0])
+  }
+  values.push(id, userId)
+  const rows = await query(
+    `update car_services set ${sets.join(', ')}
+     where id = $${values.length - 1}
+       and car_id in (select id from cars where user_id = $${values.length})
+     returning ${SERVICE_RETURN}`,
+    values,
+  )
+  if (!rows.length) throw new Error('Service not found.')
+  const service = mapService(rows[0])
+  // Keep the car's odometer in sync if the corrected reading is higher.
+  if ('meterReading' in patch) {
+    await query(
+      `update cars set current_meter = greatest(current_meter, $1) where id = $2 and user_id = $3`,
+      [service.meterReading, service.carId, userId],
+    )
+  }
+  return service
+}
+
 export async function deleteService(id: string, userId: string): Promise<void> {
   await query(
     `delete from car_services where id = $1
@@ -272,6 +333,8 @@ export async function handleCarOp(
       return getServices(userId, payload.carId ? String(payload.carId) : undefined)
     case 'addService':
       return addService(payload as unknown as Omit<CarService, 'id' | 'createdAt'>, userId)
+    case 'updateService':
+      return updateService(String(payload.id), payload.patch as Record<string, unknown>, userId)
     case 'deleteService':
       return deleteService(String(payload.id), userId)
     case 'getCarSettings':

@@ -20,7 +20,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import type { NewCarService } from '../data'
-import type { ServiceType } from '../types'
+import type { CarService, ServiceType } from '../types'
 import { OIL_BRANDS, OIL_GRADES, SERVICE_TYPES } from '../types'
 import { todayISO } from '../utils/format'
 import SelectWithOther from './SelectWithOther'
@@ -32,6 +32,8 @@ interface AddServiceDialogProps {
   carId: string
   /** Car's current odometer, used as the default meter reading. */
   currentMeter: number
+  /** When provided, the dialog edits this service instead of adding one. */
+  initial?: CarService
   onClose: () => void
   onSubmit: (input: NewCarService) => Promise<void> | void
 }
@@ -57,25 +59,34 @@ function FilterChip({
   )
 }
 
-function AddServiceDialog({ open, carId, currentMeter, onClose, onSubmit }: AddServiceDialogProps) {
+function AddServiceDialog({
+  open,
+  carId,
+  currentMeter,
+  initial,
+  onClose,
+  onSubmit,
+}: AddServiceDialogProps) {
   const theme = useTheme()
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'))
 
-  const [type, setType] = useState<ServiceType>('routine')
-  const [date, setDate] = useState(todayISO())
-  const [meter, setMeter] = useState(currentMeter > 0 ? String(currentMeter) : '')
-  const [cost, setCost] = useState('')
-  const [description, setDescription] = useState('')
+  const [type, setType] = useState<ServiceType>(initial?.type ?? 'routine')
+  const [date, setDate] = useState(initial?.date ?? todayISO())
+  const [meter, setMeter] = useState(
+    initial ? String(initial.meterReading) : currentMeter > 0 ? String(currentMeter) : '',
+  )
+  const [cost, setCost] = useState(initial?.cost ? String(initial.cost) : '')
+  const [description, setDescription] = useState(initial?.description ?? '')
 
-  const [oilChanged, setOilChanged] = useState(false)
-  const [oilBrand, setOilBrand] = useState('')
-  const [oilGrade, setOilGrade] = useState('')
-  const [oilLiters, setOilLiters] = useState('')
-  const [oilFilter, setOilFilter] = useState(false)
-  const [airFilter, setAirFilter] = useState(false)
-  const [fuelFilter, setFuelFilter] = useState(false)
-  const [acFilter, setAcFilter] = useState(false)
-  const [coolant, setCoolant] = useState(false)
+  const [oilChanged, setOilChanged] = useState(initial?.oilChanged ?? false)
+  const [oilBrand, setOilBrand] = useState(initial?.oilBrand ?? '')
+  const [oilGrade, setOilGrade] = useState(initial?.oilGrade ?? '')
+  const [oilLiters, setOilLiters] = useState(initial?.oilLiters ? String(initial.oilLiters) : '')
+  const [oilFilter, setOilFilter] = useState(initial?.oilFilterChanged ?? false)
+  const [airFilter, setAirFilter] = useState(initial?.airFilterChanged ?? false)
+  const [fuelFilter, setFuelFilter] = useState(initial?.fuelFilterChanged ?? false)
+  const [acFilter, setAcFilter] = useState(initial?.acFilterChanged ?? false)
+  const [coolant, setCoolant] = useState(initial?.coolantChanged ?? false)
 
   const [saving, setSaving] = useState(false)
 
@@ -115,7 +126,7 @@ function AddServiceDialog({ open, carId, currentMeter, onClose, onSubmit }: AddS
 
   return (
     <Dialog open={open} onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="sm">
-      <DialogTitle>Add service</DialogTitle>
+      <DialogTitle>{initial ? 'Edit service' : 'Add service'}</DialogTitle>
       {saving && <LinearProgress />}
       <DialogContent>
         <Stack spacing={2.5} sx={{ mt: 1 }}>

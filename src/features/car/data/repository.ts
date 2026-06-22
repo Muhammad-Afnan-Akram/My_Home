@@ -3,6 +3,7 @@ import type { Car, CarService, CarSettings } from '../types'
 export type NewCar = Omit<Car, 'id' | 'createdAt'>
 export type CarPatch = Partial<Omit<Car, 'id' | 'createdAt'>>
 export type NewCarService = Omit<CarService, 'id' | 'createdAt'>
+export type CarServicePatch = Partial<Omit<CarService, 'id' | 'createdAt'>>
 
 /**
  * Storage contract for the Car module. The UI only ever talks to this
@@ -17,6 +18,7 @@ export interface CarRepository {
 
   getServices(carId?: string): Promise<CarService[]>
   addService(input: NewCarService): Promise<CarService>
+  updateService(id: string, patch: CarServicePatch): Promise<CarService>
   deleteService(id: string): Promise<void>
 
   getSettings(): Promise<CarSettings>

@@ -7,6 +7,7 @@ import Chip from '@mui/material/Chip'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import type { CarService } from '../types'
 import { serviceTypeMeta } from '../types'
 import { formatDate, formatKm, formatRs, summarizeParts } from '../utils/format'
@@ -14,10 +15,11 @@ import { formatDate, formatKm, formatRs, summarizeParts } from '../utils/format'
 interface ServiceListProps {
   /** Services for one car, most recent first. */
   services: CarService[]
+  onEdit: (service: CarService) => void
   onDelete: (service: CarService) => void
 }
 
-function ServiceList({ services, onDelete }: ServiceListProps) {
+function ServiceList({ services, onEdit, onDelete }: ServiceListProps) {
   if (services.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
@@ -38,19 +40,21 @@ function ServiceList({ services, onDelete }: ServiceListProps) {
             disableGutters
             sx={{ alignItems: 'flex-start', py: 1.5 }}
             secondaryAction={
-              <Tooltip title="Delete service">
-                <IconButton
-                  edge="end"
-                  aria-label="delete service"
-                  onClick={() => onDelete(s)}
-                  color="error"
-                >
-                  <DeleteOutlineIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              <Stack direction="row" spacing={0.5}>
+                <Tooltip title="Edit service">
+                  <IconButton aria-label="edit service" onClick={() => onEdit(s)}>
+                    <EditOutlinedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Delete service">
+                  <IconButton aria-label="delete service" onClick={() => onDelete(s)} color="error">
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
             }
           >
-            <Box sx={{ minWidth: 0, flex: 1, pr: 5 }}>
+            <Box sx={{ minWidth: 0, flex: 1, pr: 9 }}>
               <Stack
                 direction="row"
                 spacing={1}

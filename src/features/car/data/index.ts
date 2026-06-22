@@ -7,4 +7,10 @@ import type { CarRepository } from './repository'
  */
 export const carRepo: CarRepository = new ApiCarRepository()
 
-export type { CarRepository, CarPatch, NewCar, NewCarService } from './repository'
+export type {
+  CarRepository,
+  CarPatch,
+  NewCar,
+  NewCarService,
+  CarServicePatch,
+} from './repository'

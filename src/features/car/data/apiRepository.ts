@@ -1,6 +1,12 @@
 import type { Car, CarService, CarSettings } from '../types'
 import { getAccessToken } from '@/lib/supabase'
-import type { CarPatch, CarRepository, NewCar, NewCarService } from './repository'
+import type {
+  CarPatch,
+  CarRepository,
+  CarServicePatch,
+  NewCar,
+  NewCarService,
+} from './repository'
 
 async function rpc<T>(op: string, payload: Record<string, unknown> = {}): Promise<T> {
   const token = await getAccessToken()
@@ -47,6 +53,10 @@ export class ApiCarRepository implements CarRepository {
 
   addService(input: NewCarService): Promise<CarService> {
     return rpc<CarService>('addService', input as unknown as Record<string, unknown>)
+  }
+
+  updateService(id: string, patch: CarServicePatch): Promise<CarService> {
+    return rpc<CarService>('updateService', { id, patch })
   }
 
   deleteService(id: string): Promise<void> {

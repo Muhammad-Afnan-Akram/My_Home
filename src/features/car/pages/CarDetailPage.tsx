@@ -59,8 +59,16 @@ function Stat({ label, value }: { label: string; value: string }) {
 function CarDetailPage() {
   const { carId = '' } = useParams()
   const navigate = useNavigate()
-  const { loading, cars, services, addService, deleteService, updateCar, oilChangeIntervalKm } =
-    useCar()
+  const {
+    loading,
+    cars,
+    services,
+    addService,
+    updateService,
+    deleteService,
+    updateCar,
+    oilChangeIntervalKm,
+  } = useCar()
 
   const car = cars.find((c) => c.id === carId)
   const carServices = useMemo(
@@ -69,6 +77,7 @@ function CarDetailPage() {
   )
 
   const [adding, setAdding] = useState(false)
+  const [editTarget, setEditTarget] = useState<CarService | null>(null)
   const [updatingMeter, setUpdatingMeter] = useState(false)
   const [openSeq, setOpenSeq] = useState(0)
   const [deleteTarget, setDeleteTarget] = useState<CarService | null>(null)
@@ -76,6 +85,12 @@ function CarDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null)
 
   const openAdd = () => {
+    setEditTarget(null)
+    setOpenSeq((n) => n + 1)
+    setAdding(true)
+  }
+  const openEdit = (service: CarService) => {
+    setEditTarget(service)
     setOpenSeq((n) => n + 1)
     setAdding(true)
   }
@@ -244,7 +259,7 @@ function CarDetailPage() {
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
             Service history
           </Typography>
-          <ServiceList services={carServices} onDelete={setDeleteTarget} />
+          <ServiceList services={carServices} onEdit={openEdit} onDelete={setDeleteTarget} />
         </Box>
       </Stack>
 
@@ -270,12 +285,18 @@ function CarDetailPage() {
         open={adding}
         carId={car.id}
         currentMeter={car.currentMeter}
+        initial={editTarget ?? undefined}
         onClose={() => setAdding(false)}
         onSubmit={async (input) => {
           try {
-            await addService(input)
+            if (editTarget) await updateService(editTarget.id, input)
+            else await addService(input)
           } catch (err) {
-            setActionError(err instanceof Error ? err.message : 'Failed to add service.')
+            setActionError(
+              err instanceof Error
+                ? err.message
+                : `Failed to ${editTarget ? 'update' : 'add'} service.`,
+            )
             throw err
           }
         }}
