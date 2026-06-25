@@ -195,6 +195,21 @@ function getSetCookies(res: Response): string[] {
 export class BillFetchError extends Error {}
 
 /**
+ * Map a network/fetch failure to a friendly BillFetchError, while logging the
+ * real cause to the server logs (visible in Vercel) so connectivity problems —
+ * timeouts, blocked datacenter IPs, TLS errors — can be told apart instead of
+ * all collapsing into one opaque message.
+ */
+function portalUnreachable(err: unknown): never {
+  console.error('[billScraper] portal request failed:', err)
+  const name = err instanceof Error ? err.name : ''
+  if (name === 'TimeoutError' || name === 'AbortError') {
+    throw new BillFetchError('The bill portal took too long to respond. Please try again in a moment.')
+  }
+  throw new BillFetchError('Could not reach the bill portal. Check your connection.')
+}
+
+/**
  * Run the portal's search flow and return the rendered bill page HTML. The site
  * is ASP.NET WebForms: load the search page for cookies + anti-forgery +
  * viewstate, then POST the reference number. The POST 302-redirects to
@@ -205,12 +220,11 @@ async function fetchBillPageHtml(safeCompany: string, ref: string): Promise<stri
   const base = `https://bill.pitc.com.pk/${safeCompany}bill`
 
   // Step 1: load the search page to get cookies + anti-forgery + viewstate.
+  // This page is always quick, so a short timeout is fine.
   const landing = await fetch(base, {
     headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,*/*;q=0.8' },
-    signal: AbortSignal.timeout(45_000),
-  }).catch(() => {
-    throw new BillFetchError('Could not reach the bill portal. Check your connection.')
-  })
+    signal: AbortSignal.timeout(15_000),
+  }).catch(portalUnreachable)
   const landingHtml = await landing.text()
   const cookies = cookieHeader(getSetCookies(landing))
 
@@ -227,7 +241,10 @@ async function fetchBillPageHtml(safeCompany: string, ref: string): Promise<stri
     btnSearch: 'Search',
   })
 
-  // Step 2: POST the search (fetch follows the redirect to the bill page).
+  // Step 2: POST the search. `fetch` follows the 302 to `/general?refno=...`,
+  // whose render can be very slow (the portal blocks on its meter-snapshot
+  // service before returning the HTML), so allow a long timeout — but keep it
+  // under the 60s serverless function limit (see vercel.json).
   const result = await fetch(base, {
     method: 'POST',
     headers: {
@@ -239,10 +256,8 @@ async function fetchBillPageHtml(safeCompany: string, ref: string): Promise<stri
       Cookie: cookies,
     },
     body: body.toString(),
-    signal: AbortSignal.timeout(45_000),
-  }).catch(() => {
-    throw new BillFetchError('Could not reach the bill portal. Check your connection.')
-  })
+    signal: AbortSignal.timeout(50_000),
+  }).catch(portalUnreachable)
   const html = await result.text()
 
   if (/Given Ref\/App No is invalid|invalid reference/i.test(html)) {

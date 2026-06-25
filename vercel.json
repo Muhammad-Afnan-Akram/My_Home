@@ -3,6 +3,9 @@
   "functions": {
     "api/bill.ts": {
       "maxDuration": 60
+    },
+    "api/bill-document.ts": {
+      "maxDuration": 60
     }
   }
 }
