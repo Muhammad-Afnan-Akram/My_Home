@@ -80,67 +80,83 @@ function toNumber(value: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
-function lineAfter(lines: string[], label: string, offset = 1): string | undefined {
-  const i = lines.indexOf(label)
-  return i !== -1 && i + offset < lines.length ? lines[i + offset] : undefined
+/** True if a line is (part of) the portal's Urdu translation of a label. */
+function isUrdu(s: string): boolean {
+  return /[؀-ۿ]/.test(s)
+}
+
+/** Numeric cell like "97", "24,150" — no other characters. */
+function isNumericLine(s: string | undefined): boolean {
+  return /^[\d,]+$/.test(s ?? '')
+}
+
+/**
+ * Indices of every line whose text — after dropping any leading emoji/symbol
+ * prefix (the portal prefixes some labels with "⚠"/"⏳"/"☰") — equals `label`.
+ */
+function labelIndices(lines: string[], label: string): number[] {
+  const out: number[] = []
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].replace(/^[^A-Za-z]+/, '').trim() === label) out.push(i)
+  }
+  return out
+}
+
+/**
+ * First line shortly after any occurrence of `label` that satisfies `ok`.
+ * The portal places an Urdu translation line (and occasionally another label)
+ * between a field's English label and its value, so scan a few lines forward
+ * rather than reading a fixed offset.
+ */
+function valueAfter(
+  lines: string[],
+  label: string,
+  ok: (s: string) => boolean,
+  scan = 3,
+): string | undefined {
+  for (const i of labelIndices(lines, label)) {
+    for (let k = i + 1; k <= i + scan && k < lines.length; k++) {
+      if (ok(lines[k])) return lines[k]
+    }
+  }
+  return undefined
 }
 
 function parseBill(html: string, company: string, referenceNumber: string): ScrapedBill {
   const L = toLines(html)
 
   const fullDate = /^\d{2} [A-Z]{3} \d{2}$/
-  const dashDate = /^\d{2}-[A-Z]{3}-\d{2}$/
   const monthTag = /^[A-Z][a-z]{2}\d{2}$/
 
-  // Sequence of "15 MAY 26" tokens: [connectionDate, reading, issue, due, ...]
-  const dates = L.filter((l) => fullDate.test(l))
+  // METER INFO block: each value sits 1-2 lines after its label (an Urdu
+  // translation line is interleaved), so read by label rather than by position.
+  const previousReading = toNumber(valueAfter(L, 'PREVIOUS READING', isNumericLine))
+  const presentReading = toNumber(valueAfter(L, 'PRESENT READING', isNumericLine))
+  const unitsConsumed = toNumber(valueAfter(L, 'UNITS', isNumericLine))
 
-  // Meter row: METER NO / PREVIOUS / PRESENT / MF / UNITS / STATUS
-  let previousReading: number | undefined
-  let presentReading: number | undefined
-  let unitsFromMeter: number | undefined
-  const si = L.indexOf('STATUS')
-  if (si !== -1) {
-    const v = L.slice(si + 1, si + 6)
-    if (v.length >= 5) {
-      previousReading = toNumber(v[1])
-      presentReading = toNumber(v[2])
-      unitsFromMeter = toNumber(v[4])
-    }
-  }
-
-  // 12-month history table: MONTH / UNITS / BILL / PAYMENT
+  // 12-month history table: MONTH / STATUS / UNITS / BILL / PAYMENT. The STATUS
+  // cell ("EX") is optional and the header row repeats partway down the table,
+  // so collect every month token rather than walking from a single header.
   const history: { month: string; units: number; amount?: number }[] = []
-  const pi = L.indexOf('PAYMENT')
-  if (pi !== -1) {
-    let j = pi + 1
-    while (j < L.length) {
-      if (monthTag.test(L[j])) {
-        const month = L[j]
-        let k = j + 1
-        if (L[k] === 'EX') k += 1
-        const units = toNumber(L[k])
-        if (units == null) break
-        // Columns after the month: UNITS (k), BILL (k+1), PAYMENT (k+2).
-        history.push({ month, units, amount: toNumber(L[k + 1]) })
-        j = k + 3 // skip units, bill, payment
-      } else if (history.length) {
-        break
-      } else {
-        j += 1
-      }
-    }
+  for (let j = 0; j < L.length; j++) {
+    if (!monthTag.test(L[j])) continue
+    let k = j + 1
+    if (L[k] === 'EX') k += 1 // optional STATUS column
+    const units = toNumber(L[k])
+    if (units == null) continue
+    // Columns after the (optional) status: UNITS (k), BILL (k+1), PAYMENT (k+2).
+    history.push({ month: L[j], units, amount: toNumber(L[k + 1]) })
   }
 
-  // Payable after due date: the "After <date> <amount>" cell.
+  // Payable after due date: the "After <date>" surcharge cell ("After 12-JUN-26"
+  // is now a single line) followed by its amount.
   let payableAfter: number | undefined
   for (let i = 0; i < L.length; i++) {
-    if (L[i] === 'After' && dashDate.test(L[i + 1] ?? '')) {
-      payableAfter = toNumber(L[i + 2])
+    if (/^After\b/.test(L[i]) && isNumericLine(L[i + 1])) {
+      payableAfter = toNumber(L[i + 1])
+      break
     }
   }
-
-  const unitsConsumed = toNumber(lineAfter(L, 'UNITS CONSUMED')) ?? unitsFromMeter
 
   // Bill month is a standalone "MON YY" token (e.g. "MAY 26").
   const monthYear = /^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC) \d{2}$/
@@ -149,15 +165,15 @@ function parseBill(html: string, company: string, referenceNumber: string): Scra
   return {
     company,
     referenceNumber,
-    customerName: lineAfter(L, 'NAME & ADDRESS'),
+    customerName: valueAfter(L, 'NAME & ADDRESS', (s) => !isUrdu(s)),
     unitsConsumed,
     presentReading,
     previousReading,
     billMonth,
-    readingDate: toISODate(dates[1]),
-    issueDate: toISODate(dates[2]),
-    dueDate: toISODate(dates[3]),
-    payableWithinDueDate: toNumber(lineAfter(L, 'PAYABLE WITHIN DUE DATE')),
+    readingDate: toISODate(valueAfter(L, 'READING DATE', (s) => fullDate.test(s))),
+    issueDate: toISODate(valueAfter(L, 'ISSUE DATE', (s) => fullDate.test(s))),
+    dueDate: toISODate(valueAfter(L, 'DUE DATE', (s) => fullDate.test(s))),
+    payableWithinDueDate: toNumber(valueAfter(L, 'PAYABLE WITHIN DUE DATE', isNumericLine)),
     payableAfterDueDate: payableAfter,
     history,
     fetchedAt: new Date().toISOString(),
