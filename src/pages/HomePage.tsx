@@ -18,6 +18,7 @@ import AddBoxOutlinedIcon from '@mui/icons-material/AddBoxOutlined'
 import BoltIcon from '@mui/icons-material/Bolt'
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar'
 import TwoWheelerIcon from '@mui/icons-material/TwoWheeler'
+import RouterIcon from '@mui/icons-material/Router'
 import WaterDropIcon from '@mui/icons-material/WaterDrop'
 import LogoutIcon from '@mui/icons-material/Logout'
 import InstallMobileIcon from '@mui/icons-material/InstallMobile'
@@ -60,6 +61,14 @@ const MODULES: ModuleDef[] = [
     icon: TwoWheelerIcon,
     color: '#10b981',
     route: ROUTES.bikes,
+  },
+  {
+    key: 'devices',
+    title: 'Devices',
+    desc: 'Wi-Fi clients & blocking',
+    icon: RouterIcon,
+    color: '#6366f1',
+    route: ROUTES.devices,
   },
   {
     key: 'water',

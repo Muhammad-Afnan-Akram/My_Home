@@ -10,4 +10,5 @@ export const ROUTES = {
   cars: '/cars',
   car: (id: string) => `/cars/${id}`,
   carReport: (id: string) => `/cars/${id}/report`,
+  devices: '/devices',
 } as const

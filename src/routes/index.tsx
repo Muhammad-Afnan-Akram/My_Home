@@ -8,4 +8,5 @@ export const routePaths = {
   home: ROUTES.home,
   electricity: ROUTES.electricity,
   meterDetail: '/electricity/:meterId',
+  devices: ROUTES.devices,
 } as const

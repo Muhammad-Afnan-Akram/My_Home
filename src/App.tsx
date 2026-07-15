@@ -6,6 +6,7 @@ import HomePage from '@/pages/HomePage'
 import { ElectricityProvider, ElectricityPage, MeterDetailPage } from '@/features/electricity'
 import { BikeProvider, BikePage, BikeDetailPage } from '@/features/bike'
 import { CarProvider, CarPage, CarDetailPage, CarReportPage } from '@/features/car'
+import { DevicesPage } from '@/features/devices'
 import { useAuth, AuthPage } from '@/features/auth'
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
               <Route path="/cars" element={<CarPage />} />
               <Route path="/cars/:carId" element={<CarDetailPage />} />
               <Route path="/cars/:carId/report" element={<CarReportPage />} />
+              <Route path="/devices" element={<DevicesPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </MainLayout>

@@ -7,6 +7,7 @@ import { getBill, fetchBillDocument, BillFetchError } from './server/billScraper
 import { handleDbOp } from './server/electricityDb'
 import { handleBikeOp } from './server/bikeDb'
 import { handleCarOp } from './server/carDb'
+import { handleRouterOp, RouterError } from './server/routerClient'
 import { getUserId, AuthError } from './server/auth'
 
 function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -138,6 +139,31 @@ function billApiPlugin(): Plugin {
         } catch (err) {
           res.statusCode = err instanceof AuthError ? 401 : 500
           res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Database error.' }))
+        }
+      })
+
+      // Router API: POST /api/router { op, payload } — manages the Zong 4G
+      // device's connected clients. Only works when the dev server runs on the
+      // Zong Wi-Fi (the router lives at 192.168.8.1 on the LAN).
+      server.middlewares.use('/api/router', async (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end(JSON.stringify({ error: 'Method not allowed' }))
+          return
+        }
+        try {
+          await getUserId(req.headers.authorization)
+          const body = await readJsonBody(req)
+          const result = await handleRouterOp(
+            String(body.op),
+            (body.payload as Record<string, unknown>) ?? {},
+          )
+          res.statusCode = 200
+          res.end(JSON.stringify(result ?? null))
+        } catch (err) {
+          res.statusCode = err instanceof AuthError ? 401 : err instanceof RouterError ? 400 : 500
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Router request failed.' }))
         }
       })
     },
