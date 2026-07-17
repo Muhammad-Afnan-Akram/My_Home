@@ -42,6 +42,23 @@ export interface ConnectedDevice {
   blocked: boolean
 }
 
+export interface RouterTraffic {
+  /** Live download rate, bytes/sec. */
+  downloadRate: number
+  /** Live upload rate, bytes/sec. */
+  uploadRate: number
+  /** Bytes downloaded during the current data connection. */
+  sessionDownload: number
+  /** Bytes uploaded during the current data connection. */
+  sessionUpload: number
+  /** Bytes downloaded since the counters were last reset (lifetime). */
+  totalDownload: number
+  /** Bytes uploaded since the counters were last reset (lifetime). */
+  totalUpload: number
+  /** Seconds the current data connection has been up. */
+  connectTime: number
+}
+
 export interface DeviceSnapshot {
   devices: ConnectedDevice[]
   /**
@@ -50,6 +67,14 @@ export interface DeviceSnapshot {
    * deny-list mode where `blockDevice`/`unblockDevice` apply.
    */
   whitelistMode: boolean
+  /**
+   * Whole-router traffic counters, when the firmware exposes them. The HiLink
+   * API reports usage per mobile-data connection for the *whole router* — it has
+   * no per-client byte counters — so this is not attached to individual devices.
+   * undefined when the endpoint is unavailable: traffic is best-effort and never
+   * fails the device list.
+   */
+  traffic?: RouterTraffic
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +264,7 @@ class RouterSession {
 
 const FILTER_PATH = '/api/security/mac-filter'
 const FIREWALL_PATH = '/api/security/firewall-switch'
+const TRAFFIC_PATH = '/api/monitoring/traffic-statistics'
 const MAX_FILTERS = 10 // the web UI caps the deny list at 10 devices
 
 interface FilterEntry {
@@ -317,14 +343,44 @@ async function writeFilter(
 }
 
 // ---------------------------------------------------------------------------
+// Traffic. The B310s reports usage per mobile-data connection for the whole
+// router (/api/monitoring/traffic-statistics); the HiLink API has no per-client
+// byte counters, so this is router-wide, not per device.
+// ---------------------------------------------------------------------------
+
+/**
+ * Read whole-router traffic counters. Best-effort: any failure — the endpoint
+ * missing on this firmware, a transient error — yields undefined so the device
+ * list still loads.
+ */
+async function readTraffic(session: RouterSession): Promise<RouterTraffic | undefined> {
+  try {
+    const xml = await session.apiGet(TRAFFIC_PATH)
+    const num = (name: string) => Number(tag(xml, name) ?? '') || 0
+    return {
+      downloadRate: num('CurrentDownloadRate'),
+      uploadRate: num('CurrentUploadRate'),
+      sessionDownload: num('CurrentDownload'),
+      sessionUpload: num('CurrentUpload'),
+      totalDownload: num('TotalDownload'),
+      totalUpload: num('TotalUpload'),
+      connectTime: num('CurrentConnectTime'),
+    }
+  } catch {
+    return undefined
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public operations.
 // ---------------------------------------------------------------------------
 
-/** Build the device list + filter mode from an already-connected session. */
+/** Build the device list + filter mode + traffic from an already-connected session. */
 async function buildSnapshot(session: RouterSession): Promise<DeviceSnapshot> {
-  const [hostXml, filter] = await Promise.all([
+  const [hostXml, filter, traffic] = await Promise.all([
     session.apiGet('/api/wlan/host-list'),
     readFilter(session),
+    readTraffic(session),
   ])
   const whitelistMode = isWhitelist(filter)
   // In allow-list mode the active entries are the *permitted* MACs, so a device
@@ -358,7 +414,7 @@ async function buildSnapshot(session: RouterSession): Promise<DeviceSnapshot> {
     if (a.online !== b.online) return a.online ? -1 : 1
     return (a.hostName ?? a.mac).localeCompare(b.hostName ?? b.mac)
   })
-  return { devices, whitelistMode }
+  return { devices, whitelistMode, traffic }
 }
 
 async function listDevices(): Promise<DeviceSnapshot> {
@@ -430,7 +486,17 @@ async function setWhitelist(rawMacs: string[]): Promise<DeviceSnapshot> {
 async function diag(): Promise<Record<string, string>> {
   const session = new RouterSession()
   await session.connect()
-  const paths = ['/api/device/information', '/api/wlan/host-list', FILTER_PATH, FIREWALL_PATH]
+  const paths = [
+    '/api/device/information',
+    '/api/wlan/host-list',
+    // Whole-router usage counters (surfaced on the Devices page). The HiLink API
+    // has no per-client byte counters — host-info is kept here only to re-confirm
+    // that on a firmware bump.
+    TRAFFIC_PATH,
+    '/api/wlan/host-info',
+    FILTER_PATH,
+    FIREWALL_PATH,
+  ]
   const out: Record<string, string> = {}
   for (const p of paths) {
     try {

@@ -31,9 +31,10 @@ interface DeviceCardProps {
   /** Another device's action is in flight — disable this one's button too. */
   disabled: boolean
   /**
-   * Router is in allow-list mode. Per-device block/unblock doesn't apply then
-   * (membership is edited via the whitelist), so hide the button and show
-   * whether this device is on the allowed list instead.
+   * Router is in allow-list mode. Per-device actions still work — blocking
+   * removes the device from the allowed set — but the "restore" action reads
+   * as "Allow" rather than "Unblock", and non-blocked devices show an
+   * "Allowed" chip.
    */
   whitelistMode: boolean
   onBlock: () => void
@@ -43,6 +44,8 @@ interface DeviceCardProps {
 function DeviceCard({ device, busy, disabled, whitelistMode, onBlock, onUnblock }: DeviceCardProps) {
   const icon = iconFor(device.hostName)
   const title = device.hostName || 'Unknown device'
+  // What the "restore access" action is called depends on the router mode.
+  const restoreLabel = whitelistMode ? 'Allow' : 'Unblock'
 
   return (
     <Card
@@ -113,33 +116,29 @@ function DeviceCard({ device, busy, disabled, whitelistMode, onBlock, onUnblock 
           </Stack>
         </Box>
 
-        {!whitelistMode && (
-          <Button
-            size="small"
-            variant={device.blocked ? 'contained' : 'outlined'}
-            color="error"
-            disabled={disabled}
-            onClick={device.blocked ? onUnblock : onBlock}
-            startIcon={
-              busy ? (
-                <CircularProgress size={14} color="inherit" />
-              ) : device.blocked ? (
-                <CheckCircleIcon />
-              ) : (
-                <BlockIcon />
-              )
-            }
-            sx={{
-              flexShrink: 0,
-              minWidth: 96,
-              ...(device.blocked
-                ? { bgcolor: ACCENT, '&:hover': { bgcolor: '#4f46e5' } }
-                : {}),
-            }}
-          >
-            {device.blocked ? 'Unblock' : 'Block'}
-          </Button>
-        )}
+        <Button
+          size="small"
+          variant={device.blocked ? 'contained' : 'outlined'}
+          color="error"
+          disabled={disabled}
+          onClick={device.blocked ? onUnblock : onBlock}
+          startIcon={
+            busy ? (
+              <CircularProgress size={14} color="inherit" />
+            ) : device.blocked ? (
+              <CheckCircleIcon />
+            ) : (
+              <BlockIcon />
+            )
+          }
+          sx={{
+            flexShrink: 0,
+            minWidth: 96,
+            ...(device.blocked ? { bgcolor: ACCENT, '&:hover': { bgcolor: '#4f46e5' } } : {}),
+          }}
+        >
+          {device.blocked ? restoreLabel : 'Block'}
+        </Button>
       </Stack>
     </Card>
   )

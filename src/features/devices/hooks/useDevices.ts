@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ConnectedDevice, DeviceSnapshot } from '../types'
+import type { ConnectedDevice, DeviceSnapshot, RouterTraffic } from '../types'
 import { deviceRepo } from '../data'
 
 export interface DevicesState {
@@ -7,6 +7,8 @@ export interface DevicesState {
   /** Non-null when the initial load failed. */
   error: string | null
   devices: ConnectedDevice[]
+  /** Whole-router traffic counters, or null when the firmware doesn't expose them. */
+  traffic: RouterTraffic | null
   /** true when the router is in allow-list mode (block all except a keep set). */
   whitelistMode: boolean
   /** MAC currently being blocked/unblocked, or null. */
@@ -35,14 +37,17 @@ export function useDevices(): DevicesState {
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [devices, setDevices] = useState<ConnectedDevice[]>([])
+  const [traffic, setTraffic] = useState<RouterTraffic | null>(null)
   const [whitelistMode, setWhitelistMode] = useState(false)
   const [busyMac, setBusyMac] = useState<string | null>(null)
   const [applyingWhitelist, setApplyingWhitelist] = useState(false)
 
-  // Fold a snapshot into state — device list and filter mode always move together.
+  // Fold a snapshot into state — device list, filter mode and traffic always
+  // move together (each snapshot carries the fresh counters).
   const apply = useCallback((snap: DeviceSnapshot) => {
     setDevices(snap.devices)
     setWhitelistMode(snap.whitelistMode)
+    setTraffic(snap.traffic ?? null)
   }, [])
 
   // Initial load. Mirrors the other modules' provider pattern: an async IIFE
@@ -92,15 +97,36 @@ export function useDevices(): DevicesState {
     [apply],
   )
 
+  // Block a single device. In deny-list mode this adds the MAC to the block
+  // list; in allow-list (whitelist) mode there is no block list, so blocking
+  // means dropping the device from the allowed set instead. Either way the
+  // per-device spinner (busyMac) drives the card, unlike the bulk whitelist
+  // edit which uses applyingWhitelist.
   const block = useCallback(
     (device: ConnectedDevice) =>
-      run(device, () => deviceRepo.blockDevice(device.mac, device.hostName)),
-    [run],
+      run(device, () =>
+        whitelistMode
+          ? deviceRepo.setWhitelist(
+              devices.filter((d) => !d.blocked && d.mac !== device.mac).map((d) => d.mac),
+            )
+          : deviceRepo.blockDevice(device.mac, device.hostName),
+      ),
+    [run, whitelistMode, devices],
   )
 
+  // Restore access to a single device. In whitelist mode that means adding the
+  // MAC back to the allowed set; otherwise it drops the MAC from the block list.
   const unblock = useCallback(
-    (device: ConnectedDevice) => run(device, () => deviceRepo.unblockDevice(device.mac)),
-    [run],
+    (device: ConnectedDevice) =>
+      run(device, () =>
+        whitelistMode
+          ? deviceRepo.setWhitelist([
+              ...devices.filter((d) => !d.blocked).map((d) => d.mac),
+              device.mac,
+            ])
+          : deviceRepo.unblockDevice(device.mac),
+      ),
+    [run, whitelistMode, devices],
   )
 
   const setWhitelist = useCallback(
@@ -121,6 +147,7 @@ export function useDevices(): DevicesState {
     loading,
     error,
     devices,
+    traffic,
     whitelistMode,
     busyMac,
     applyingWhitelist,

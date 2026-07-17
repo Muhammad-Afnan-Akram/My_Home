@@ -19,10 +19,13 @@ import DialogActions from '@mui/material/DialogActions'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import RouterIcon from '@mui/icons-material/Router'
 import ShieldIcon from '@mui/icons-material/Shield'
+import SouthIcon from '@mui/icons-material/South'
+import NorthIcon from '@mui/icons-material/North'
 import { ROUTES } from '@/constants'
 import { Screen } from '@/components'
 import { useDevices } from '../hooks/useDevices'
 import { DeviceCard } from '../components'
+import { formatBytes, formatRate, formatDuration } from '../utils/format'
 import type { ConnectedDevice } from '../types'
 
 const ACCENT = '#6366f1'
@@ -32,6 +35,7 @@ function DevicesPage() {
     loading,
     error,
     devices,
+    traffic,
     whitelistMode,
     busyMac,
     applyingWhitelist,
@@ -139,6 +143,54 @@ function DevicesPage() {
               <Chip size="small" color="error" label={`${blockedCount} blocked`} />
             )}
           </Stack>
+
+          {/* Router traffic. Shown only when the firmware exposes counters; these
+              are whole-router totals, not per device. */}
+          {traffic && (
+            <Box
+              sx={{
+                mb: 2,
+                p: 1.5,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+              }}
+            >
+              <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flex: 1 }}>
+                  <SouthIcon sx={{ fontSize: 18, color: 'success.main' }} />
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
+                      {formatRate(traffic.downloadRate)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      download
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flex: 1 }}>
+                  <NorthIcon sx={{ fontSize: 18, color: ACCENT }} />
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
+                      {formatRate(traffic.uploadRate)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      upload
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Stack>
+              <Typography variant="caption" color="text.secondary" component="div">
+                This session: {formatBytes(traffic.sessionDownload)} ↓ ·{' '}
+                {formatBytes(traffic.sessionUpload)} ↑
+                {traffic.connectTime > 0 ? ` · up ${formatDuration(traffic.connectTime)}` : ''}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" component="div">
+                Total: {formatBytes(traffic.totalDownload)} ↓ · {formatBytes(traffic.totalUpload)} ↑
+              </Typography>
+            </Box>
+          )}
 
           {whitelistMode ? (
             <Alert
