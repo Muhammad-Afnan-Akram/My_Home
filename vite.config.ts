@@ -7,6 +7,7 @@ import { getBill, fetchBillDocument, BillFetchError } from './server/billScraper
 import { handleDbOp } from './server/electricityDb'
 import { handleBikeOp } from './server/bikeDb'
 import { handleCarOp } from './server/carDb'
+import { handleDeviceNamesOp } from './server/deviceNamesDb'
 import { handleRouterOp, RouterError } from './server/routerClient'
 import { getUserId, AuthError } from './server/auth'
 
@@ -130,6 +131,31 @@ function billApiPlugin(): Plugin {
           const userId = await getUserId(req.headers.authorization)
           const body = await readJsonBody(req)
           const result = await handleCarOp(
+            String(body.op),
+            (body.payload as Record<string, unknown>) ?? {},
+            userId,
+          )
+          res.statusCode = 200
+          res.end(JSON.stringify(result ?? null))
+        } catch (err) {
+          res.statusCode = err instanceof AuthError ? 401 : 500
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Database error.' }))
+        }
+      })
+
+      // Device names API: POST /api/device-names { op, payload } — persists
+      // per-user friendly names for connected devices in Supabase Postgres.
+      server.middlewares.use('/api/device-names', async (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end(JSON.stringify({ error: 'Method not allowed' }))
+          return
+        }
+        try {
+          const userId = await getUserId(req.headers.authorization)
+          const body = await readJsonBody(req)
+          const result = await handleDeviceNamesOp(
             String(body.op),
             (body.payload as Record<string, unknown>) ?? {},
             userId,

@@ -7,6 +7,8 @@ export interface ConnectedDevice {
   mac: string
   /** Router-reported host name, when known. */
   hostName?: string
+  /** User-chosen friendly name, persisted per user in our DB (keyed by MAC). */
+  customName?: string
   ipAddress?: string
   /** true when currently associated to the Wi-Fi. */
   online: boolean

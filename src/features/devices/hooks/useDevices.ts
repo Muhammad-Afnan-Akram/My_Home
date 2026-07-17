@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ConnectedDevice, DeviceSnapshot, RouterTraffic } from '../types'
 import { deviceRepo } from '../data'
+import { deviceNamesRepo, type DeviceNameMap } from '../data/deviceNamesApi'
 
 export interface DevicesState {
   loading: boolean
@@ -24,6 +25,8 @@ export interface DevicesState {
   unblock: (device: ConnectedDevice) => Promise<void>
   /** Keep only these MACs connected; [] allows every device again. */
   setWhitelist: (macs: string[]) => Promise<void>
+  /** Set a friendly name for a device (empty string clears it). */
+  rename: (device: ConnectedDevice, name: string) => Promise<void>
 }
 
 /**
@@ -37,6 +40,7 @@ export function useDevices(): DevicesState {
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [devices, setDevices] = useState<ConnectedDevice[]>([])
+  const [namesByMac, setNamesByMac] = useState<DeviceNameMap>({})
   const [traffic, setTraffic] = useState<RouterTraffic | null>(null)
   const [whitelistMode, setWhitelistMode] = useState(false)
   const [busyMac, setBusyMac] = useState<string | null>(null)
@@ -55,9 +59,14 @@ export function useDevices(): DevicesState {
   useEffect(() => {
     let active = true
     ;(async () => {
+      // Custom names are best-effort: a DB hiccup must never hide the device
+      // list, so fetch them alongside and swallow their errors.
+      const namesPromise = deviceNamesRepo.getNames().catch(() => ({}) as DeviceNameMap)
       try {
         const snap = await deviceRepo.listDevices()
         if (active) apply(snap)
+        const names = await namesPromise
+        if (active) setNamesByMac(names)
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : 'Failed to load devices.')
       } finally {
@@ -143,10 +152,28 @@ export function useDevices(): DevicesState {
     [apply],
   )
 
+  // Save a friendly name for a device. An empty name clears the override so the
+  // router-reported host name shows again. Keyed by MAC, not IP — DHCP hands out
+  // fresh IPs, but a device's MAC is stable.
+  const rename = useCallback(async (device: ConnectedDevice, name: string) => {
+    try {
+      setNamesByMac(await deviceNamesRepo.setName(device.mac, name))
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to save the device name.')
+    }
+  }, [])
+
+  // Overlay each device with its user-chosen name (when set), so the whole UI
+  // reads the friendly name off `customName`.
+  const namedDevices = useMemo(
+    () => devices.map((d) => ({ ...d, customName: namesByMac[d.mac] })),
+    [devices, namesByMac],
+  )
+
   return {
     loading,
     error,
-    devices,
+    devices: namedDevices,
     traffic,
     whitelistMode,
     busyMac,
@@ -158,5 +185,6 @@ export function useDevices(): DevicesState {
     block,
     unblock,
     setWhitelist,
+    rename,
   }
 }

@@ -4,12 +4,14 @@ import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
 import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
 import CircularProgress from '@mui/material/CircularProgress'
 import SmartphoneIcon from '@mui/icons-material/Smartphone'
 import LaptopMacIcon from '@mui/icons-material/LaptopMac'
 import DevicesOtherIcon from '@mui/icons-material/DevicesOther'
 import BlockIcon from '@mui/icons-material/Block'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import EditIcon from '@mui/icons-material/Edit'
 import type { ReactNode } from 'react'
 import type { ConnectedDevice } from '../types'
 
@@ -39,11 +41,27 @@ interface DeviceCardProps {
   whitelistMode: boolean
   onBlock: () => void
   onUnblock: () => void
+  /** Open the rename dialog for this device. */
+  onRename: () => void
 }
 
-function DeviceCard({ device, busy, disabled, whitelistMode, onBlock, onUnblock }: DeviceCardProps) {
-  const icon = iconFor(device.hostName)
-  const title = device.hostName || 'Unknown device'
+function DeviceCard({
+  device,
+  busy,
+  disabled,
+  whitelistMode,
+  onBlock,
+  onUnblock,
+  onRename,
+}: DeviceCardProps) {
+  const icon = iconFor(device.customName || device.hostName)
+  const title = device.customName || device.hostName || 'Unknown device'
+  // When a custom name overrides a different router name, keep the original
+  // visible as a hint so the device is still recognisable.
+  const originalHint =
+    device.customName && device.hostName && device.hostName !== device.customName
+      ? device.hostName
+      : null
   // What the "restore access" action is called depends on the router mode.
   const restoreLabel = whitelistMode ? 'Allow' : 'Unblock'
 
@@ -75,12 +93,24 @@ function DeviceCard({ device, busy, disabled, whitelistMode, onBlock, onUnblock 
         </Box>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="subtitle2" noWrap sx={{ fontWeight: 700 }}>
-            {title}
-          </Typography>
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+            <Typography variant="subtitle2" noWrap sx={{ fontWeight: 700, minWidth: 0 }}>
+              {title}
+            </Typography>
+            <IconButton
+              size="small"
+              aria-label="Rename device"
+              onClick={onRename}
+              disabled={disabled}
+              sx={{ flexShrink: 0, color: 'text.secondary', p: 0.25 }}
+            >
+              <EditIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Stack>
           <Typography variant="caption" color="text.secondary" noWrap component="div">
             {device.ipAddress ? `${device.ipAddress} · ` : ''}
             {device.mac}
+            {originalHint ? ` · ${originalHint}` : ''}
           </Typography>
           <Stack direction="row" spacing={0.75} sx={{ mt: 0.75 }}>
             {device.online ? (

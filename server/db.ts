@@ -135,6 +135,16 @@ create table if not exists car_settings (
   oil_change_interval_km int not null default 5000,
   updated_at timestamptz not null default now()
 );
+create table if not exists device_names (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  mac text not null,
+  name text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, mac)
+);
+create index if not exists device_names_user_idx on device_names(user_id);
 `
 
 let schemaReady: Promise<void> | null = null

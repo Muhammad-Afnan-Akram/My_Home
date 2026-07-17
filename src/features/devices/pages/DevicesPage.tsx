@@ -24,7 +24,7 @@ import NorthIcon from '@mui/icons-material/North'
 import { ROUTES } from '@/constants'
 import { Screen } from '@/components'
 import { useDevices } from '../hooks/useDevices'
-import { DeviceCard } from '../components'
+import { DeviceCard, RenameDeviceDialog } from '../components'
 import { formatBytes, formatRate, formatDuration } from '../utils/format'
 import type { ConnectedDevice } from '../types'
 
@@ -46,8 +46,10 @@ function DevicesPage() {
     block,
     unblock,
     setWhitelist,
+    rename,
   } = useDevices()
   const [confirmTarget, setConfirmTarget] = useState<ConnectedDevice | null>(null)
+  const [renameTarget, setRenameTarget] = useState<ConnectedDevice | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -264,6 +266,7 @@ function DevicesPage() {
                   whitelistMode={whitelistMode}
                   onBlock={() => setConfirmTarget(device)}
                   onUnblock={() => void unblock(device)}
+                  onRename={() => setRenameTarget(device)}
                 />
               ))}
             </Stack>
@@ -294,7 +297,7 @@ function DevicesPage() {
                 label={
                   <Box sx={{ minWidth: 0 }}>
                     <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                      {d.hostName || 'Unknown device'}
+                      {d.customName || d.hostName || 'Unknown device'}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" noWrap component="div">
                       {d.ipAddress ? `${d.ipAddress} · ` : ''}
@@ -324,7 +327,8 @@ function DevicesPage() {
         <DialogTitle>Block this device?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            “{confirmTarget?.hostName || confirmTarget?.mac}” will be disconnected and won't be able
+            “{confirmTarget?.customName || confirmTarget?.hostName || confirmTarget?.mac}” will be
+            disconnected and won't be able
             to rejoin the Zong Wi-Fi until you unblock it.
           </DialogContentText>
         </DialogContent>
@@ -335,6 +339,14 @@ function DevicesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {renameTarget && (
+        <RenameDeviceDialog
+          device={renameTarget}
+          onClose={() => setRenameTarget(null)}
+          onSubmit={(name) => rename(renameTarget, name)}
+        />
+      )}
 
       <Snackbar
         open={Boolean(actionError)}
