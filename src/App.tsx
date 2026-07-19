@@ -8,9 +8,10 @@ import { BikeProvider, BikePage, BikeDetailPage } from '@/features/bike'
 import { CarProvider, CarPage, CarDetailPage, CarReportPage } from '@/features/car'
 import { DevicesPage } from '@/features/devices'
 import { useAuth, AuthPage } from '@/features/auth'
+import { canAccessDevices } from '@/constants'
 
 function App() {
-  const { loading, session, recovery } = useAuth()
+  const { loading, session, recovery, user } = useAuth()
 
   if (loading) {
     return (
@@ -40,7 +41,12 @@ function App() {
               <Route path="/cars" element={<CarPage />} />
               <Route path="/cars/:carId" element={<CarDetailPage />} />
               <Route path="/cars/:carId/report" element={<CarReportPage />} />
-              <Route path="/devices" element={<DevicesPage />} />
+              <Route
+                path="/devices"
+                element={
+                  canAccessDevices(user?.email) ? <DevicesPage /> : <Navigate to="/" replace />
+                }
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </MainLayout>

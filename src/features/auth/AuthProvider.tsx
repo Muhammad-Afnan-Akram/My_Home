@@ -41,7 +41,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { needsConfirmation: !data.session }
       },
       async signOut() {
-        await supabase.auth.signOut()
+        // Clear local session state up front so the app returns to the login
+        // screen instantly, without waiting on — or being blocked by — the
+        // network token revoke. onAuthStateChange also emits SIGNED_OUT, but
+        // doing this here makes logout immediate and reliable even if the
+        // revoke is slow, fails, or the device is offline.
+        setSession(null)
+        setRecovery(false)
+        await supabase.auth.signOut().catch(() => {})
       },
       async sendPasswordReset(email) {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {

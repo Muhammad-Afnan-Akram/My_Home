@@ -64,6 +64,13 @@ function DeviceCard({
       : null
   // What the "restore access" action is called depends on the router mode.
   const restoreLabel = whitelistMode ? 'Allow' : 'Unblock'
+  // A blocked entry that is offline and has no name (router host name or custom)
+  // is almost always a stale block: phones randomise their MAC per network, so a
+  // device you blocked can reconnect under a fresh MAC, leaving the old block
+  // stranded here. Flag it so it reads as leftover clutter, not a mystery
+  // auto-block of some new device.
+  const staleBlock =
+    device.blocked && !device.online && !device.customName && !device.hostName
 
   return (
     <Card
@@ -144,6 +151,17 @@ function DeviceCard({
               />
             )}
           </Stack>
+          {staleBlock && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              component="div"
+              sx={{ mt: 0.5, fontStyle: 'italic' }}
+            >
+              Likely a stale block — this device may have reconnected with a new MAC. Safe to
+              unblock.
+            </Typography>
+          )}
         </Box>
 
         <Button

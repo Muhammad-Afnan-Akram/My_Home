@@ -23,7 +23,7 @@ import WaterDropIcon from '@mui/icons-material/WaterDrop'
 import LogoutIcon from '@mui/icons-material/Logout'
 import InstallMobileIcon from '@mui/icons-material/InstallMobile'
 import type { SvgIconComponent } from '@mui/icons-material'
-import { ROUTES } from '@/constants'
+import { ROUTES, canAccessDevices } from '@/constants'
 import { Screen } from '@/components'
 import { useAuth } from '@/features/auth'
 import { useInstallPrompt } from '@/pwa/useInstallPrompt'
@@ -85,6 +85,9 @@ function HomePage() {
   const { canInstall, promptInstall, showIOSInstall } = useInstallPrompt()
   const [iosGuideOpen, setIosGuideOpen] = useState(false)
 
+  // The Devices module is restricted to the router-admin account.
+  const modules = MODULES.filter((mod) => mod.key !== 'devices' || canAccessDevices(user?.email))
+
   const actions = (
     <>
       {(canInstall || showIOSInstall) && (
@@ -117,7 +120,7 @@ function HomePage() {
           gap: 2,
         }}
       >
-        {MODULES.map((mod) => {
+        {modules.map((mod) => {
           const Icon = mod.icon
           const enabled = Boolean(mod.route)
           return (
