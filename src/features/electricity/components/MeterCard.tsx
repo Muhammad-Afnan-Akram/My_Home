@@ -95,6 +95,9 @@ function MeterCard({
   // Calculations lean on an old bill when we're anchored to one that isn't
   // this month's — surface that as an estimate rather than official data.
   const estimated = c.anchoredToBill && !isLatest
+  // The right-hand bill panel shows the current bill when it's this month's,
+  // otherwise it falls back to the most recent one we have on file.
+  const billHeading = isLatest ? 'Current bill' : 'Recent bill'
 
   return (
     <Card variant="outlined" sx={{ borderRadius: 3 }}>
@@ -178,21 +181,22 @@ function MeterCard({
                         ? unitLimit > 0
                           ? `Limit ${unitLimit}`
                           : 'No limit set'
-                        : unitLimit > 0
-                          ? `${c.unitsUsed} / ${unitLimit} · ${daysLeft}d left`
-                          : `${c.unitsUsed} units · ${daysLeft}d left`}
+                        : `${daysLeft}d left`}
                     </Typography>
-                    {estimated && (
-                      <Chip
-                        size="small"
-                        color="warning"
-                        variant="outlined"
-                        label="⚠ Estimated from last bill"
-                      />
-                    )}
                   </>
                 )}
               </Stack>
+              {c.baselineValue != null && (
+                <Typography
+                  variant="caption"
+                  noWrap
+                  sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}
+                >
+                  {`Reading ${c.baselineValue.toLocaleString()}`}
+                  {c.latestValue != null && ` → ${c.latestValue.toLocaleString()}`}
+                  {c.unitsUsed != null && ` · +${c.unitsUsed.toLocaleString()} units`}
+                </Typography>
+              )}
               {(billMonth || issueDate) && (
                 <Stack direction="row" spacing={1} sx={{ mt: 1, alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
                   {billMonth && <Chip size="small" variant="outlined" label={`Bill: ${billMonth}`} />}
@@ -203,8 +207,8 @@ function MeterCard({
                       <Chip
                         size="small"
                         color="warning"
-                        variant="filled"
-                        label="Waiting for next bill"
+                        variant="outlined"
+                        label={estimated ? 'Estimated · awaiting next bill' : 'Awaiting next bill'}
                       />
                     ))}
                 </Stack>
@@ -214,7 +218,7 @@ function MeterCard({
 
           {/* Separator: a hairline below the identity block on mobile, a vertical
               rule between the two columns on desktop. */}
-          {isLatest && bill && (
+          {bill && (
             <Box
               sx={{
                 alignSelf: 'stretch',
@@ -230,9 +234,10 @@ function MeterCard({
             />
           )}
 
-          {/* Current bill: a wrapping row across the card on mobile, a right-aligned
-              column on desktop. */}
-          {isLatest && bill && (
+          {/* Bill summary — current bill this month, else the most recent one:
+              a wrapping row across the card on mobile, a right-aligned column on
+              desktop. */}
+          {bill && (
             <Stack
               direction={{ xs: 'row', sm: 'column' }}
               spacing={0.75}
@@ -254,7 +259,7 @@ function MeterCard({
                   width: { xs: '100%', sm: 'auto' },
                 }}
               >
-                Current bill
+                {billHeading}
               </Typography>
               {bill.units != null && (
                 <Tooltip title="Units consumed">
