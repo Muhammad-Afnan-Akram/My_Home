@@ -27,13 +27,21 @@ import { ROUTES } from '@/constants'
 import { Screen } from '@/components'
 import { useCar } from '../hooks/carContext'
 import type { CarService } from '../types'
-import { AddServiceDialog, ServiceList, UpdateMeterDialog, ServiceGauge } from '../components'
 import {
+  AddServiceDialog,
+  MaintenanceCard,
+  ServiceList,
+  UpdateMeterDialog,
+  ServiceGauge,
+} from '../components'
+import {
+  dueStatuses,
   effectiveInterval,
   formatDate,
   formatKm,
   formatRs,
   lastOilChangeReading,
+  maintenanceStatuses,
   serviceStatus,
   sortServicesByDate,
 } from '../utils/format'
@@ -105,6 +113,9 @@ function CarDetailPage() {
   const sinceOil = car && lastOil != null ? Math.max(0, car.currentMeter - lastOil) : null
   const interval = car ? effectiveInterval(car, oilChangeIntervalKm) : oilChangeIntervalKm
   const status = car ? serviceStatus(interval, car.currentMeter, lastOil) : null
+  // Per-item due tracking: oil, filters, brakes, tyres, battery and the rest.
+  const statuses = car ? maintenanceStatuses(car, carServices, oilChangeIntervalKm) : []
+  const dueNow = dueStatuses(statuses)
 
   const confirmDelete = async () => {
     if (!deleteTarget) return
@@ -246,14 +257,35 @@ function CarDetailPage() {
                 <Stat label="Total spent" value={formatRs(totalSpent)} />
               </Box>
             </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+              {interval > 0
+                ? `Oil and oil filter tracked every ${formatKm(interval)}${
+                    car.serviceIntervalKm && car.serviceIntervalKm > 0
+                      ? ' — set for this car'
+                      : ' — the default for all cars'
+                  }`
+                : 'Oil-change tracking is off — set an interval on this car or in car settings.'}
+            </Typography>
             {status?.overdue && (
               <Alert severity="warning" sx={{ mt: 2 }}>
                 This car is {formatKm(-status.remaining)} past its {formatKm(interval)} oil-change
                 interval.
               </Alert>
             )}
+            {dueNow.length > 0 && (
+              <Alert severity={dueNow.some((s) => s.overdue) ? 'error' : 'warning'} sx={{ mt: 2 }}>
+                {dueNow.length} item{dueNow.length === 1 ? '' : 's'} need attention:{' '}
+                {dueNow
+                  .slice(0, 4)
+                  .map((s) => s.item.label)
+                  .join(', ')}
+                {dueNow.length > 4 && ` +${dueNow.length - 4} more`}
+              </Alert>
+            )}
           </Box>
         </Card>
+
+        <MaintenanceCard statuses={statuses} />
 
         <Box>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
@@ -285,6 +317,7 @@ function CarDetailPage() {
         open={adding}
         carId={car.id}
         currentMeter={car.currentMeter}
+        dueKeys={dueNow.map((s) => s.item.key)}
         initial={editTarget ?? undefined}
         onClose={() => setAdding(false)}
         onSubmit={async (input) => {

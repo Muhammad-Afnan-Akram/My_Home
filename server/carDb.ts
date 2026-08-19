@@ -16,6 +16,16 @@ interface Car {
   createdAt: string
 }
 
+/** One maintenance job recorded against a service (see the frontend catalog). */
+interface ServiceItem {
+  key: string
+  brand?: string
+  spec?: string
+  qty?: number
+  cost?: number
+  note?: string
+}
+
 interface CarService {
   id: string
   carId: string
@@ -23,15 +33,7 @@ interface CarService {
   meterReading: number
   type: string
   cost: number
-  oilChanged: boolean
-  oilBrand?: string
-  oilGrade?: string
-  oilLiters?: number
-  oilFilterChanged: boolean
-  airFilterChanged: boolean
-  fuelFilterChanged: boolean
-  acFilterChanged: boolean
-  coolantChanged: boolean
+  items: ServiceItem[]
   description?: string
   createdAt: string
 }
@@ -62,6 +64,113 @@ function mapCar(r: Row): Car {
   }
 }
 
+/**
+ * The boolean columns that predate the maintenance-item list, mapped to their
+ * catalog keys. Rows written before `items` existed are read through these, and
+ * new writes keep them in sync so nothing that still reads them breaks.
+ */
+const LEGACY_ITEM_COLUMNS: Record<string, string> = {
+  'engine-oil': 'oil_changed',
+  'oil-filter': 'oil_filter_changed',
+  'air-filter': 'air_filter_changed',
+  'fuel-filter': 'fuel_filter_changed',
+  'ac-filter': 'ac_filter_changed',
+  coolant: 'coolant_changed',
+}
+
+const ENGINE_OIL_KEY = 'engine-oil'
+/** Guard rails on free text going into jsonb. */
+const MAX_TEXT = 120
+
+function text(v: unknown): string | undefined {
+  if (v == null) return undefined
+  const s = String(v).trim().slice(0, MAX_TEXT)
+  return s.length ? s : undefined
+}
+
+function positive(v: unknown): number | undefined {
+  if (v == null || v === '') return undefined
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+/** Validate + strip the item list coming from the client before storing it. */
+function normalizeItems(raw: unknown): ServiceItem[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const items: ServiceItem[] = []
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue
+    const key = text((entry as Row).key)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    const item: ServiceItem = { key }
+    const brand = text((entry as Row).brand)
+    const spec = text((entry as Row).spec)
+    const note = text((entry as Row).note)
+    const qty = positive((entry as Row).qty)
+    const cost = positive((entry as Row).cost)
+    if (brand) item.brand = brand
+    if (spec) item.spec = spec
+    if (note) item.note = note
+    if (qty != null) item.qty = qty
+    if (cost != null) item.cost = cost
+    items.push(item)
+  }
+  return items
+}
+
+/** Legacy boolean / oil columns derived from an item list. */
+function legacyColumnsFor(items: ServiceItem[]): Row {
+  const oil = items.find((i) => i.key === ENGINE_OIL_KEY)
+  const out: Row = {
+    oil_brand: oil?.brand ?? null,
+    oil_grade: oil?.spec ?? null,
+    oil_liters: oil?.qty ?? null,
+  }
+  for (const [key, column] of Object.entries(LEGACY_ITEM_COLUMNS)) {
+    out[column] = items.some((i) => i.key === key)
+  }
+  return out
+}
+
+/** Item list rebuilt from the legacy boolean columns, for pre-`items` rows. */
+function legacyItemsFrom(r: Row): ServiceItem[] {
+  const items: ServiceItem[] = []
+  for (const [key, column] of Object.entries(LEGACY_ITEM_COLUMNS)) {
+    if (!r[column]) continue
+    if (key === ENGINE_OIL_KEY) {
+      const oil: ServiceItem = { key }
+      const brand = text(r.oil_brand)
+      const spec = text(r.oil_grade)
+      const qty = positive(r.oil_liters)
+      if (brand) oil.brand = brand
+      if (spec) oil.spec = spec
+      if (qty != null) oil.qty = qty
+      items.push(oil)
+    } else {
+      items.push({ key })
+    }
+  }
+  return items
+}
+
+function readItems(r: Row): ServiceItem[] {
+  const raw = r.items
+  const parsed = typeof raw === 'string' ? safeParse(raw) : raw
+  const items = normalizeItems(parsed)
+  // Rows written before the `items` column existed still carry only booleans.
+  return items.length ? items : legacyItemsFrom(r)
+}
+
+function safeParse(s: string): unknown {
+  try {
+    return JSON.parse(s)
+  } catch {
+    return []
+  }
+}
+
 function mapService(r: Row): CarService {
   return {
     id: String(r.id),
@@ -70,22 +179,14 @@ function mapService(r: Row): CarService {
     meterReading: Number(r.meter_reading),
     type: String(r.type),
     cost: Number(r.cost),
-    oilChanged: Boolean(r.oil_changed),
-    oilBrand: str(r.oil_brand),
-    oilGrade: str(r.oil_grade),
-    oilLiters: num(r.oil_liters),
-    oilFilterChanged: Boolean(r.oil_filter_changed),
-    airFilterChanged: Boolean(r.air_filter_changed),
-    fuelFilterChanged: Boolean(r.fuel_filter_changed),
-    acFilterChanged: Boolean(r.ac_filter_changed),
-    coolantChanged: Boolean(r.coolant_changed),
+    items: readItems(r),
     description: str(r.description),
     createdAt: iso(r.created_at),
   }
 }
 
 const SERVICE_COLS = `s.id, s.car_id, to_char(s.date, 'YYYY-MM-DD') as date, s.meter_reading, s.type,
-  s.cost, s.oil_changed, s.oil_brand, s.oil_grade, s.oil_liters, s.oil_filter_changed,
+  s.cost, s.items, s.oil_changed, s.oil_brand, s.oil_grade, s.oil_liters, s.oil_filter_changed,
   s.air_filter_changed, s.fuel_filter_changed, s.ac_filter_changed, s.coolant_changed,
   s.description, s.created_at`
 
@@ -182,12 +283,14 @@ export async function addService(
   input: Omit<CarService, 'id' | 'createdAt'>,
   userId: string,
 ): Promise<CarService> {
+  const items = normalizeItems(input.items)
+  const legacy = legacyColumnsFor(items)
   const rows = await query(
-    `insert into car_services (car_id, date, meter_reading, type, cost, oil_changed, oil_brand,
+    `insert into car_services (car_id, date, meter_reading, type, cost, items, oil_changed, oil_brand,
        oil_grade, oil_liters, oil_filter_changed, air_filter_changed, fuel_filter_changed,
        ac_filter_changed, coolant_changed, description)
-     select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
-     where exists (select 1 from cars where id = $1 and user_id = $16)
+     select $1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+     where exists (select 1 from cars where id = $1 and user_id = $17)
      returning ${SERVICE_COLS.replace(/\bs\./g, '')}`,
     [
       input.carId,
@@ -195,15 +298,16 @@ export async function addService(
       input.meterReading,
       input.type ?? 'service',
       input.cost ?? 0,
-      input.oilChanged ?? false,
-      input.oilBrand ?? null,
-      input.oilGrade ?? null,
-      input.oilLiters ?? null,
-      input.oilFilterChanged ?? false,
-      input.airFilterChanged ?? false,
-      input.fuelFilterChanged ?? false,
-      input.acFilterChanged ?? false,
-      input.coolantChanged ?? false,
+      JSON.stringify(items),
+      legacy.oil_changed,
+      legacy.oil_brand,
+      legacy.oil_grade,
+      legacy.oil_liters,
+      legacy.oil_filter_changed,
+      legacy.air_filter_changed,
+      legacy.fuel_filter_changed,
+      legacy.ac_filter_changed,
+      legacy.coolant_changed,
       input.description ?? null,
       userId,
     ],
@@ -223,32 +327,38 @@ const SERVICE_COLUMNS: Record<string, string> = {
   meterReading: 'meter_reading',
   type: 'type',
   cost: 'cost',
-  oilChanged: 'oil_changed',
-  oilBrand: 'oil_brand',
-  oilGrade: 'oil_grade',
-  oilLiters: 'oil_liters',
-  oilFilterChanged: 'oil_filter_changed',
-  airFilterChanged: 'air_filter_changed',
-  fuelFilterChanged: 'fuel_filter_changed',
-  acFilterChanged: 'ac_filter_changed',
-  coolantChanged: 'coolant_changed',
   description: 'description',
 }
 
 const SERVICE_RETURN = SERVICE_COLS.replace(/\bs\./g, '')
+
+/** Column → value pairs for a service patch, expanding `items` into its columns. */
+function serviceColumnValues(patch: Record<string, unknown>): Row {
+  const out: Row = {}
+  for (const [key, column] of Object.entries(SERVICE_COLUMNS)) {
+    if (key in patch) out[column] = patch[key]
+  }
+  if ('items' in patch) {
+    const items = normalizeItems(patch.items)
+    // jsonb must go over the wire as text — node-postgres would otherwise turn
+    // a JS array into a Postgres array literal.
+    out.items = JSON.stringify(items)
+    Object.assign(out, legacyColumnsFor(items))
+  }
+  return out
+}
 
 export async function updateService(
   id: string,
   patch: Record<string, unknown>,
   userId: string,
 ): Promise<CarService> {
+  const columns = serviceColumnValues(patch)
   const sets: string[] = []
   const values: unknown[] = []
-  for (const [key, column] of Object.entries(SERVICE_COLUMNS)) {
-    if (key in patch) {
-      values.push(patch[key])
-      sets.push(`${column} = $${values.length}`)
-    }
+  for (const [column, value] of Object.entries(columns)) {
+    values.push(value)
+    sets.push(`${column} = $${values.length}${column === 'items' ? '::jsonb' : ''}`)
   }
   if (sets.length === 0) {
     const rows = await query(

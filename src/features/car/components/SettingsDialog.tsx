@@ -50,6 +50,10 @@ function SettingsDialog({ open, oilChangeIntervalKm, onClose, onSave }: Settings
             car as due once it's been driven this far since its last oil change, or turn it off to
             just log services.
           </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Everything else — filters, brakes, tyres, battery, belts — tracks against its own
+            recommended interval automatically, from the last service you logged it in.
+          </Typography>
           <FormControlLabel
             control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
             label="Track an oil-change interval"

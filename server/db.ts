@@ -125,10 +125,14 @@ create table if not exists car_services (
   fuel_filter_changed boolean not null default false,
   ac_filter_changed boolean not null default false,
   coolant_changed boolean not null default false,
+  items jsonb not null default '[]'::jsonb,
   description text,
   created_at timestamptz not null default now()
 );
 alter table car_services add column if not exists coolant_changed boolean not null default false;
+-- Work done is recorded as a list of maintenance items; the older boolean
+-- columns above are kept in sync so existing rows keep reading correctly.
+alter table car_services add column if not exists items jsonb not null default '[]'::jsonb;
 create index if not exists car_services_car_idx on car_services(car_id);
 create table if not exists car_settings (
   user_id uuid primary key,

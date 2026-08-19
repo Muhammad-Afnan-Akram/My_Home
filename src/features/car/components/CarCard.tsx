@@ -14,11 +14,13 @@ import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined'
 import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined'
 import type { Car, CarService } from '../types'
 import {
+  dueStatuses,
   effectiveInterval,
   formatDate,
   formatKm,
   formatRs,
   lastOilChangeReading,
+  maintenanceStatuses,
   serviceStatus,
   sortServicesByDate,
 } from '../utils/format'
@@ -53,6 +55,8 @@ function CarCard({
   const interval = effectiveInterval(car, oilChangeIntervalKm)
   const status = serviceStatus(interval, car.currentMeter, lastOil)
   const totalSpent = services.reduce((sum, s) => sum + s.cost, 0)
+  // Everything the car is due for — oil, filters, brakes, tyres, battery…
+  const due = dueStatuses(maintenanceStatuses(car, sorted, oilChangeIntervalKm))
 
   return (
     <Card
@@ -124,8 +128,13 @@ function CarCard({
               </Typography>
             </Stack>
 
-            {status?.overdue && (
-              <Chip size="small" color="warning" label="Oil change due" sx={{ mt: 1, fontWeight: 600 }} />
+            {due.length > 0 && (
+              <Chip
+                size="small"
+                color={due.some((d) => d.overdue) ? 'error' : 'warning'}
+                label={due.length === 1 ? `${due[0].item.label} due` : `${due.length} items due`}
+                sx={{ mt: 1, fontWeight: 600 }}
+              />
             )}
           </Box>
         </Stack>

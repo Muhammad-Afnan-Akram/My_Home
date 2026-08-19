@@ -21,15 +21,22 @@ import SpeedOutlinedIcon from '@mui/icons-material/SpeedOutlined'
 import { ROUTES } from '@/constants'
 import { Screen } from '@/components'
 import { useCar } from '../hooks/carContext'
-import { SERVICE_TYPES, serviceTypeMeta } from '../types'
+import { ENGINE_OIL_KEY, SERVICE_TYPES, itemLabel, serviceTypeMeta } from '../types'
 import {
+  describeItem,
+  dueStatuses,
   effectiveInterval,
   formatDate,
   formatKm,
   formatRs,
+  isTracked,
   lastOilChangeReading,
+  maintenanceStatuses,
   serviceStatus,
+  sortItems,
   sortServicesByDate,
+  statusHistory,
+  statusSummary,
 } from '../utils/format'
 
 /** Blue accent that signs the car module across the app. */
@@ -96,18 +103,19 @@ function CarReportPage() {
       count: carServices.filter((s) => s.type === t.value).length,
       spend: carServices.filter((s) => s.type === t.value).reduce((sum, s) => sum + s.cost, 0),
     }))
-    const tally = {
-      oil: carServices.filter((s) => s.oilChanged).length,
-      oilFilter: carServices.filter((s) => s.oilFilterChanged).length,
-      airFilter: carServices.filter((s) => s.airFilterChanged).length,
-      fuelFilter: carServices.filter((s) => s.fuelFilterChanged).length,
-      acFilter: carServices.filter((s) => s.acFilterChanged).length,
-      coolant: carServices.filter((s) => s.coolantChanged).length,
+    // How many times each maintenance item has been done, most frequent first.
+    const counts = new Map<string, number>()
+    for (const s of carServices) {
+      for (const i of s.items) counts.set(i.key, (counts.get(i.key) ?? 0) + 1)
     }
+    const tally = [...counts.entries()]
+      .map(([key, n]) => ({ key, label: itemLabel(key), n }))
+      .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label))
+    const oilChanges = counts.get(ENGINE_OIL_KEY) ?? 0
     // carServices is newest-first; first/last by date.
     const newest = carServices[0]
     const oldest = carServices[carServices.length - 1]
-    return { total, count, byType, tally, newest, oldest }
+    return { total, count, byType, tally, oilChanges, newest, oldest }
   }, [carServices])
 
   if (loading) {
@@ -145,14 +153,10 @@ function CarReportPage() {
       : '—'
   const maxTypeSpend = Math.max(1, ...stats.byType.map((t) => t.spend))
 
-  const tallyItems = [
-    { label: 'Oil changes', n: stats.tally.oil },
-    { label: 'Oil filters', n: stats.tally.oilFilter },
-    { label: 'Air filters', n: stats.tally.airFilter },
-    { label: 'Fuel filters', n: stats.tally.fuelFilter },
-    { label: 'AC filters', n: stats.tally.acFilter },
-    { label: 'Coolant', n: stats.tally.coolant },
-  ].filter((t) => t.n > 0)
+  // Per-item due tracking for the maintenance schedule section below.
+  const statuses = maintenanceStatuses(car, carServices, oilChangeIntervalKm)
+  const trackedStatuses = statuses.filter((s) => !s.never && isTracked(s))
+  const dueNow = dueStatuses(statuses)
 
   return (
     <Screen
@@ -284,7 +288,7 @@ function CarReportPage() {
           <Kpi
             icon={<OilBarrelOutlinedIcon />}
             label="Oil changes"
-            value={String(stats.tally.oil)}
+            value={String(stats.oilChanges)}
             tint="#9333ea"
           />
           <Kpi
@@ -339,19 +343,63 @@ function CarReportPage() {
         )}
 
         {/* Parts tally */}
-        {tallyItems.length > 0 && (
+        {stats.tally.length > 0 && (
           <Card variant="outlined" sx={{ borderRadius: 3, p: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
               Parts & fluids replaced
             </Typography>
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
-              {tallyItems.map((t) => (
+              {stats.tally.map((t) => (
                 <Chip
-                  key={t.label}
+                  key={t.key}
                   label={`${t.label} ×${t.n}`}
                   variant="outlined"
                   sx={{ fontWeight: 500 }}
                 />
+              ))}
+            </Stack>
+          </Card>
+        )}
+
+        {/* Maintenance schedule — where every tracked item stands right now. */}
+        {trackedStatuses.length > 0 && (
+          <Card variant="outlined" sx={{ borderRadius: 3, p: 2 }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1 }}>
+                Maintenance schedule
+              </Typography>
+              <Chip
+                size="small"
+                color={dueNow.length === 0 ? 'success' : dueNow.some((d) => d.overdue) ? 'error' : 'warning'}
+                label={dueNow.length === 0 ? 'All good' : `${dueNow.length} due`}
+                sx={{ fontWeight: 600 }}
+              />
+            </Stack>
+            <Stack divider={<Divider flexItem />}>
+              {trackedStatuses.map((s) => (
+                <Box key={s.item.key} sx={{ py: 1 }}>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, minWidth: 0 }}>
+                      {s.item.label}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color={s.level === 'safe' ? 'text.secondary' : `${s.level === 'over' ? 'error' : 'warning'}.main`}
+                      sx={{ fontWeight: 600, flexShrink: 0 }}
+                    >
+                      {statusSummary(s)}
+                    </Typography>
+                  </Stack>
+                  <LinearProgress
+                    variant="determinate"
+                    value={s.pct}
+                    color={s.level === 'over' ? 'error' : s.level === 'warning' ? 'warning' : 'success'}
+                    sx={{ height: 6, borderRadius: 3, my: 0.5, bgcolor: 'action.hover' }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {statusHistory(s)}
+                  </Typography>
+                </Box>
               ))}
             </Stack>
           </Card>
@@ -370,18 +418,7 @@ function CarReportPage() {
             <Box>
               {carServices.map((s, i) => {
                 const meta = serviceTypeMeta(s.type)
-                const parts: string[] = []
-                if (s.oilChanged) {
-                  const detail = [s.oilBrand, s.oilGrade, s.oilLiters ? `${s.oilLiters}L` : null]
-                    .filter(Boolean)
-                    .join(' ')
-                  parts.push(detail ? `Engine oil — ${detail}` : 'Engine oil')
-                }
-                if (s.oilFilterChanged) parts.push('Oil filter')
-                if (s.airFilterChanged) parts.push('Air filter')
-                if (s.fuelFilterChanged) parts.push('Fuel filter')
-                if (s.acFilterChanged) parts.push('AC filter')
-                if (s.coolantChanged) parts.push('Coolant')
+                const parts = sortItems(s.items).map(describeItem)
                 const isLast = i === carServices.length - 1
                 return (
                   <Box key={s.id} sx={{ display: 'flex', gap: 1.5, alignItems: 'stretch' }}>
