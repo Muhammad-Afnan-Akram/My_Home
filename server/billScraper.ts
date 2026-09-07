@@ -202,6 +202,159 @@ function parseBill(
   };
 }
 
+/** Shape of the relevant fields in the CCMS `basicInfo`/`histInfo`/`metersInfo` JSON. */
+interface CcmsBillResponse {
+  message?: string;
+  bill?: {
+    status?: boolean;
+    error?: string | null;
+    basicInfo?: Record<string, unknown>;
+    histInfo?: Record<string, unknown>;
+    metersInfo?: { mtrKwhPrvRead?: number; mtrKwhPrsRead?: number }[];
+  };
+}
+
+/** "2026-08-01T00:00:00" -> "2026-08-01"; passes through plain ISO dates. */
+function ccmsDate(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  return value.slice(0, 10);
+}
+
+function ccmsNumber(value: unknown): number | undefined {
+  if (value == null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** "2026-08-01T00:00:00" (billMonth) -> "AUG 26", matching the scraper's format. */
+function ccmsMonthLabel(value: unknown): string | undefined {
+  const iso = ccmsDate(value);
+  if (!iso) return undefined;
+  const m = iso.match(/^(\d{4})-(\d{2})-\d{2}$/);
+  if (!m) return undefined;
+  const monthName = Object.entries(MONTHS).find(([, mm]) => mm === m[2])?.[0];
+  if (!monthName) return undefined;
+  return `${monthName} ${m[1].slice(2)}`;
+}
+
+/** "24 AUG 26" (meterReadDate) -> "2026-08-24". */
+function ccmsReadDate(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const m = value.trim().match(/^(\d{2}) ([A-Z]{3}) (\d{2})$/i);
+  if (!m) return undefined;
+  const mm = MONTHS[m[2].toUpperCase()];
+  if (!mm) return undefined;
+  return `20${m[3]}-${mm}-${m[1]}`;
+}
+
+/** "27-Aug-2026" (issueDate) -> "2026-08-27". */
+function ccmsIssueDate(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const m = value.trim().match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+  if (!m) return undefined;
+  const mm = MONTHS[m[2].toUpperCase()];
+  if (!mm) return undefined;
+  return `${m[3]}-${mm}-${m[1]}`;
+}
+
+/**
+ * histInfo carries 13 parallel "gbHistMM{n}"/"gbHistUnits{n}"/"gbHistAssment{n}"
+ * fields (oldest last) instead of an array; collect and reverse them into the
+ * scraper's oldest-first month/units/amount shape.
+ */
+function ccmsHistory(
+  histInfo: Record<string, unknown> | undefined,
+): { month: string; units: number; amount?: number }[] {
+  if (!histInfo) return [];
+  const out: { month: string; units: number; amount?: number }[] = [];
+  for (let n = 1; n <= 13; n++) {
+    const month = histInfo[`gbHistMM${n}`];
+    const units = ccmsNumber(histInfo[`gbHistUnits${n}`]);
+    if (typeof month !== "string" || !month || units == null) continue;
+    out.push({
+      month: month.replace("-", ""),
+      units,
+      amount: ccmsNumber(histInfo[`gbHistAssment${n}`]),
+    });
+  }
+  return out.reverse();
+}
+
+/**
+ * Fallback bill source: the CCMS JSON API (ccms.pitc.com.pk) behind the public
+ * "FeederDetails" page — anyone can open that page and look up a reference
+ * number, no login required. Like any Laravel app it just needs a session +
+ * XSRF cookie pair, minted by loading the page once, the same way
+ * `fetchBillPageHtml` bootstraps a session against the WebForms portal.
+ * Stays reachable when the WebForms portal 400s. Throws BillFetchError on
+ * failure.
+ */
+async function fetchBillFromCcms(
+  company: string,
+  ref: string,
+): Promise<ScrapedBill> {
+  const base = "https://ccms.pitc.com.pk";
+
+  // Step 1: load the public page to mint a session + XSRF-TOKEN cookie pair.
+  const landing = await fetch(`${base}/FeederDetails`, {
+    headers: {
+      "User-Agent": UA,
+      Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+    },
+    signal: AbortSignal.timeout(15_000),
+  }).catch(portalUnreachable);
+  const cookies = cookieHeader(getSetCookies(landing));
+
+  // Step 2: call the JSON API with that session's cookies.
+  const url = `${base}/api/details/bill?reference=${encodeURIComponent(ref)}`;
+  const res = await fetch(url, {
+    headers: {
+      Accept: "*/*",
+      "User-Agent": UA,
+      Referer: `${base}/FeederDetails`,
+      "X-Requested-With": "XMLHttpRequest",
+      Cookie: cookies,
+    },
+    signal: AbortSignal.timeout(20_000),
+  }).catch(portalUnreachable);
+
+  if (!res.ok) {
+    throw new BillFetchError(
+      `CCMS bill lookup failed (HTTP ${res.status}).`,
+    );
+  }
+
+  const data = (await res.json()) as CcmsBillResponse;
+  const info = data.bill?.basicInfo;
+  if (!data.bill?.status || !info) {
+    throw new BillFetchError(
+      data.bill?.error || "Reference number not found on the CCMS portal.",
+    );
+  }
+
+  const meter = data.bill?.metersInfo?.[0];
+  const payableWithinDueDate = ccmsNumber(info.netBill);
+  const surcharge = ccmsNumber(info.LatePaymentSurcharge) ?? 0;
+
+  return {
+    company,
+    referenceNumber: ref,
+    customerName: typeof info.consumerName === "string" ? info.consumerName.trim() : undefined,
+    unitsConsumed: ccmsNumber(info.totCurCons),
+    presentReading: meter?.mtrKwhPrsRead,
+    previousReading: meter?.mtrKwhPrvRead,
+    billMonth: ccmsMonthLabel(info.billMonth),
+    readingDate: ccmsReadDate(info.meterReadDate),
+    issueDate: ccmsIssueDate(info.issueDate),
+    dueDate: ccmsDate(info.billDueDate),
+    payableWithinDueDate,
+    payableAfterDueDate:
+      payableWithinDueDate != null ? payableWithinDueDate + surcharge : undefined,
+    history: ccmsHistory(data.bill?.histInfo),
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
 function cookieHeader(setCookies: string[]): string {
   return setCookies.map((c) => c.split(";")[0]).join("; ");
 }
@@ -317,14 +470,24 @@ export async function fetchBill(
   if (!safeCompany || !ref)
     throw new BillFetchError("Company and reference number are required.");
 
-  const html = await fetchBillPageHtml(safeCompany, ref);
-  const bill = parseBill(html, safeCompany, ref);
-  if (bill.unitsConsumed == null && bill.payableWithinDueDate == null) {
-    throw new BillFetchError(
-      "Could not read the bill. The portal layout may have changed.",
+  try {
+    const html = await fetchBillPageHtml(safeCompany, ref);
+    const bill = parseBill(html, safeCompany, ref);
+    if (bill.unitsConsumed == null && bill.payableWithinDueDate == null) {
+      throw new BillFetchError(
+        "Could not read the bill. The portal layout may have changed.",
+      );
+    }
+    return bill;
+  } catch (err) {
+    // The WebForms portal (bill.pitc.com.pk) frequently 400s. Fall back to the
+    // CCMS JSON API, which serves the same data under a separate auth flow.
+    console.error(
+      `[billScraper] ${safeCompany} WebForms lookup failed, falling back to CCMS:`,
+      err,
     );
+    return fetchBillFromCcms(safeCompany, ref);
   }
-  return bill;
 }
 
 /** Make the portal's printable bill page render standalone by resolving its
