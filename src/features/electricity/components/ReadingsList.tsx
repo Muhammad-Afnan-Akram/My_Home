@@ -1,3 +1,10 @@
+import { useState } from 'react'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogContentText from '@mui/material/DialogContentText'
+import DialogActions from '@mui/material/DialogActions'
+import Button from '@mui/material/Button'
 import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
 import ListItemText from '@mui/material/ListItemText'
@@ -10,10 +17,24 @@ import { formatShort, formatTime } from '../utils/date'
 
 interface ReadingsListProps {
   readings: Reading[]
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void | Promise<void>
 }
 
 function ReadingsList({ readings, onDelete }: ReadingsListProps) {
+  const [target, setTarget] = useState<Reading | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const confirm = async () => {
+    if (!target) return
+    setDeleting(true)
+    try {
+      await onDelete(target.id)
+      setTarget(null)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (readings.length === 0) {
     return (
       <Box sx={{ py: 4, textAlign: 'center' }}>
@@ -29,13 +50,14 @@ function ReadingsList({ readings, onDelete }: ReadingsListProps) {
     .reverse()
 
   return (
+    <>
     <List disablePadding>
       {rows.map(({ reading, delta }) => (
         <ListItem
           key={reading.id}
           divider
           secondaryAction={
-            <IconButton edge="end" aria-label="delete" onClick={() => onDelete(reading.id)}>
+            <IconButton edge="end" aria-label="delete" onClick={() => setTarget(reading)}>
               <DeleteOutlineIcon />
             </IconButton>
           }
@@ -67,6 +89,25 @@ function ReadingsList({ readings, onDelete }: ReadingsListProps) {
         </ListItem>
       ))}
     </List>
+    <Dialog open={Boolean(target)} onClose={() => !deleting && setTarget(null)}>
+      <DialogTitle>Delete this reading?</DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          {target
+            ? `The reading of ${target.value} units on ${formatShort(target.date)} will be removed from the list.`
+            : ''}
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setTarget(null)} disabled={deleting}>
+          Cancel
+        </Button>
+        <Button color="error" onClick={confirm} disabled={deleting}>
+          {deleting ? 'Deleting…' : 'Delete'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   )
 }
 

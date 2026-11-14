@@ -123,7 +123,10 @@ function CarFormDialog({ open, initial, defaultIntervalKm, onClose, onSubmit }: 
         model,
         variant,
         year: Number.isFinite(year) && year > 0 ? year : undefined,
-        serviceIntervalKm: Number.isFinite(interval) && interval > 0 ? interval : undefined,
+        // When editing, a blank field sends 0 ("use the default") rather than undefined,
+        // because undefined is dropped from the JSON patch and the old value would stick.
+        serviceIntervalKm:
+          Number.isFinite(interval) && interval > 0 ? interval : initial ? 0 : undefined,
         color: form.color.trim() || undefined,
         imageUrl: form.imageUrl || undefined,
         registrationNumber: form.registrationNumber.trim(),

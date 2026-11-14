@@ -13,6 +13,9 @@ const KEYS = {
   settings: 'myhome.electricity.settings',
 } as const
 
+/** A reading as persisted locally; soft-deleted ones carry `deletedAt`. */
+type StoredReading = Reading & { deletedAt?: string }
+
 const DEFAULT_SETTINGS: Settings = { unitLimit: 200 }
 
 function read<T>(key: string, fallback: T): T {
@@ -77,22 +80,24 @@ export class LocalElectricityRepository implements ElectricityRepository {
   }
 
   async getReadings(meterId?: string): Promise<Reading[]> {
-    const all = read<Reading[]>(KEYS.readings, [])
+    const all = read<StoredReading[]>(KEYS.readings, []).filter((r) => !r.deletedAt)
     return meterId ? all.filter((r) => r.meterId === meterId) : all
   }
 
   async addReading(input: NewReading): Promise<Reading> {
-    const all = await this.getReadings()
+    const all = read<StoredReading[]>(KEYS.readings, [])
     const reading: Reading = { ...input, id: newId(), createdAt: new Date().toISOString() }
     write(KEYS.readings, [...all, reading])
     return reading
   }
 
   async deleteReading(id: string): Promise<void> {
-    const all = await this.getReadings()
+    // Soft delete: keep the record, just mark it deleted.
+    const all = read<StoredReading[]>(KEYS.readings, [])
+    const now = new Date().toISOString()
     write(
       KEYS.readings,
-      all.filter((r) => r.id !== id),
+      all.map((r) => (r.id === id && !r.deletedAt ? { ...r, deletedAt: now } : r)),
     )
   }
 

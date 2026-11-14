@@ -170,14 +170,14 @@ export async function getReadings(userId: string, meterId?: string): Promise<Rea
   if (meterId) {
     const rows = await query(
       `select ${READING_COLS} from readings r join meters m on m.id = r.meter_id
-       where m.user_id = $1 and r.meter_id = $2 order by r.date asc`,
+       where m.user_id = $1 and r.meter_id = $2 and r.deleted_at is null order by r.date asc`,
       [userId, meterId],
     )
     return rows.map(mapReading)
   }
   const rows = await query(
     `select ${READING_COLS} from readings r join meters m on m.id = r.meter_id
-     where m.user_id = $1 order by r.date asc`,
+     where m.user_id = $1 and r.deleted_at is null order by r.date asc`,
     [userId],
   )
   return rows.map(mapReading)
@@ -200,7 +200,7 @@ export async function addReading(
 
 export async function deleteReading(id: string, userId: string): Promise<void> {
   await query(
-    `delete from readings where id = $1
+    `update readings set deleted_at = now() where id = $1 and deleted_at is null
      and meter_id in (select id from meters where user_id = $2)`,
     [id, userId],
   )
